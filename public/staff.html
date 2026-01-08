@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Dashboard - School Portal</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">School Portal</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Home</a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                            Dashboard
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="/teacher">Teacher Dashboard</a></li>
+                            <li><a class="dropdown-item" href="/student">Student Dashboard</a></li>
+                            <li><a class="dropdown-item" href="/staff">Staff Dashboard</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/logout">Logout</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-5">
+        <div class="row">
+            <div class="col-md-12">
+                <h2>Staff Dashboard</h2>
+                <p>Welcome, Staff! You can manage school operations and student information.</p>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Manage Students</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="studentForm">
+                            <div class="mb-3">
+                                <label for="studentName" class="form-label">Student Name</label>
+                                <input type="text" class="form-control" id="studentName" name="studentName" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="studentEmail" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="studentEmail" name="studentEmail" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="studentClass" class="form-label">Class</label>
+                                <input type="text" class="form-control" id="studentClass" name="studentClass" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="studentId" class="form-label">Student ID</label>
+                                <input type="text" class="form-control" id="studentId" name="studentId" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Add Student</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Manage Teachers</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="teacherForm">
+                            <div class="mb-3">
+                                <label for="teacherName" class="form-label">Teacher Name</label>
+                                <input type="text" class="form-control" id="teacherName" name="teacherName" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="teacherEmail" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="teacherEmail" name="teacherEmail" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="teacherSubject" class="form-label">Subject</label>
+                                <input type="text" class="form-control" id="teacherSubject" name="teacherSubject" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="teacherId" class="form-label">Teacher ID</label>
+                                <input type="text" class="form-control" id="teacherId" name="teacherId" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Add Teacher</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>School Statistics</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="card text-center bg-primary text-white">
+                                    <div class="card-body">
+                                        <h5 id="totalStudents">0</h5>
+                                        <p class="card-text">Total Students</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card text-center bg-success text-white">
+                                    <div class="card-body">
+                                        <h5 id="totalTeachers">0</h5>
+                                        <p class="card-text">Total Teachers</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card text-center bg-info text-white">
+                                    <div class="card-body">
+                                        <h5 id="totalClasses">0</h5>
+                                        <p class="card-text">Total Classes</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card text-center bg-warning text-dark">
+                                    <div class="card-body">
+                                        <h5 id="avgGrade">0%</h5>
+                                        <p class="card-text">Average Grade</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Manage School Announcements</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="announcementForm">
+                            <div class="mb-3">
+                                <label for="announcementTitle" class="form-label">Title</label>
+                                <input type="text" class="form-control" id="announcementTitle" name="title" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="announcementContent" class="form-label">Content</label>
+                                <textarea class="form-control" id="announcementContent" name="content" rows="3" required></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label for="announcementDate" class="form-label">Date</label>
+                                <input type="date" class="form-control" id="announcementDate" name="date" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Post Announcement</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer mt-5 py-4 bg-light">
+        <div class="container text-center">
+            <span class="text-muted">© 2026 School Portal. All rights reserved.</span>
+        </div>
+    </footer>
+
+    <script src="/js/staff.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

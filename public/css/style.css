@@ -1,0 +1,59 @@
+/* General styles */
+body {
+    background-color: #f8f9fa;
+}
+
+.navbar-brand {
+    font-weight: bold;
+}
+
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.footer {
+    margin-top: auto;
+}
+
+/* Dashboard specific styles */
+.dashboard-stats {
+    margin-top: 20px;
+}
+
+.stat-card {
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+/* Form styles */
+.form-container {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+/* Table styles */
+.table th {
+    border-top: none;
+}
+
+/* Button styles */
+.btn {
+    margin: 2px;
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+    .container {
+        padding: 0 15px;
+    }
+    
+    .card {
+        margin-bottom: 15px;
+    }
+}
