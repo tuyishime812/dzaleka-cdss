@@ -3,80 +3,318 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>School Portal</title>
+    <title>Dzaleka CDSS School - Excellence in Education</title>
     <link rel="stylesheet" href="/css/style.css">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .hero-section {
+            background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%230d6efd"/><circle cx="50" cy="50" r="40" fill="%230b5ed7"/></svg>');
+            background-size: cover;
+            background-position: center;
+            height: 60vh;
+            display: flex;
+            align-items: center;
+            color: white;
+        }
+        .photo-gallery {
+            margin: 2rem 0;
+        }
+        .photo-item {
+            overflow: hidden;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .photo-item img {
+            transition: transform 0.3s ease;
+        }
+        .photo-item:hover img {
+            transform: scale(1.05);
+        }
+        .section-padding {
+            padding: 3rem 0;
+        }
+        .feature-card {
+            transition: transform 0.3s ease;
+            height: 100%;
+        }
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+        .stats-section {
+            background-color: #f8f9fa;
+        }
+    </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top">
         <div class="container">
-            <a class="navbar-brand" href="/">School Portal</a>
+            <a class="navbar-brand" href="/">
+                <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='30' height='30' viewBox='0 0 24 24'><path fill='%23ffffff' d='M12 3L1 9l4 2.18v6L12 21l7-3.82v-6l2-1.09V17h2V9L12 3zm6.82 6L12 12.72 5.18 9 12 5.28 18.82 9zM17 15.99l-5 2.73-5-2.73v-3.72L12 15l5-2.73v3.72z'/></svg>" alt="Logo" class="d-inline-block align-text-top me-2">
+                Dzaleka CDSS School
+            </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="/">Home</a>
+                        <a class="nav-link active" href="/">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#about">About</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#gallery">Gallery</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#contact">Contact</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="/login">Login</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/about">About</a>
                     </li>
                 </ul>
             </div>
         </div>
     </nav>
 
-    <div class="container mt-5">
-        <div class="row">
-            <div class="col-md-12 text-center">
-                <h1>Welcome to the School Portal</h1>
-                <p class="lead">Teachers can upload grades, students can check their exam results, and staff can manage school operations.</p>
-                
-                <div class="mt-4">
-                    <a href="/login" class="btn btn-primary btn-lg me-3">Login</a>
-                    <a href="/register" class="btn btn-outline-primary btn-lg">Register</a>
-                </div>
-            </div>
-        </div>
-
-        <div class="row mt-5">
-            <div class="col-md-4">
-                <div class="card text-center h-100">
-                    <div class="card-body">
-                        <h5 class="card-title">For Teachers</h5>
-                        <p class="card-text">Upload student grades and exam results securely.</p>
-                        <a href="/teacher" class="btn btn-primary">Teacher Dashboard</a>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card text-center h-100">
-                    <div class="card-body">
-                        <h5 class="card-title">For Students</h5>
-                        <p class="card-text">Check your exam results and academic progress.</p>
-                        <a href="/student" class="btn btn-success">Student Dashboard</a>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card text-center h-100">
-                    <div class="card-body">
-                        <h5 class="card-title">For Staff</h5>
-                        <p class="card-text">Manage school operations and student information.</p>
-                        <a href="/staff" class="btn btn-info">Staff Dashboard</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <footer class="footer mt-5 py-4 bg-light">
+    <!-- Hero Section -->
+    <section class="hero-section">
         <div class="container text-center">
-            <span class="text-muted">© 2026 School Portal. All rights reserved.</span>
+            <h1 class="display-3 fw-bold">Welcome to Dzaleka CDSS School</h1>
+            <p class="lead mb-4">Excellence in Education, Innovation in Learning</p>
+            <div class="mt-4">
+                <a href="#about" class="btn btn-light btn-lg me-3">Learn More</a>
+                <a href="/login" class="btn btn-primary btn-lg">Student Portal</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="section-padding">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h2 class="fw-bold">About Our School</h2>
+                    <p class="lead">Dzaleka CDSS School is committed to providing quality education that prepares students for success in a rapidly changing world.</p>
+                    <p>Founded in 2005, our institution has grown to become one of the leading educational centers in the region, serving over 1,200 students annually.</p>
+                    <p>We offer a comprehensive curriculum that balances academic excellence with character development, preparing students to become responsible citizens and leaders of tomorrow.</p>
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body text-center">
+                                    <h3 class="card-title">1,200+</h3>
+                                    <p class="card-text">Students Enrolled</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-success text-white">
+                                <div class="card-body text-center">
+                                    <h3 class="card-title">65</h3>
+                                    <p class="card-text">Qualified Teachers</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="ratio ratio-16x9">
+                        <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='400' viewBox='0 0 600 400'><rect width='600' height='400' fill='%23e9ecef'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='20' fill='%236c757d'>School Building Image</text></svg>" class="img-fluid rounded shadow" alt="School Building">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Programs Section -->
+    <section class="section-padding bg-light">
+        <div class="container">
+            <div class="text-center mb-5">
+                <h2 class="fw-bold">Our Academic Programs</h2>
+                <p class="lead">Comprehensive education for all levels</p>
+            </div>
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="card feature-card h-100">
+                        <div class="card-body text-center p-4">
+                            <div class="bg-primary bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 60px; height: 60px;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-mortarboard text-primary" viewBox="0 0 16 16">
+                                    <path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 7.14V13a1 1 0 0 0-1 1v2h3v-2a1 1 0 0 0-1-1V6.739l.686-.277a.5.5 0 0 0 .025-.917zM8 8.46 1.732 5.907a1 1 0 0 1 .136-.985l.845-.338a7.5 7.5 0 0 1 11.37 5.835l.844.338a1 1 0 0 1 .136.985z"/>
+                                </svg>
+                            </div>
+                            <h5 class="card-title">Primary Education</h5>
+                            <p class="card-text">Foundation years focusing on literacy, numeracy, and social skills development.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card feature-card h-100">
+                        <div class="card-body text-center p-4">
+                            <div class="bg-success bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 60px; height: 60px;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-book text-success" viewBox="0 0 16 16">
+                                    <path d="M1 2.828c.885-.37 2.154-.769 3.388-.893 1.33-.134 2.458.063 3.112.752v9.746c-.935-.53-2.12-.603-3.213-.493-1.18.12-2.37.461-3.287.811V2.828zm7.5-.141c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492V2.687zM8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783z"/>
+                                </svg>
+                            </div>
+                            <h5 class="card-title">Secondary Education</h5>
+                            <p class="card-text">Advanced studies preparing students for university and career paths.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card feature-card h-100">
+                        <div class="card-body text-center p-4">
+                            <div class="bg-info bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 60px; height: 60px;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-laptop text-info" viewBox="0 0 16 16">
+                                    <path d="M13.5 3a.5.5 0 0 1 .5.5V11H2V3.5a.5.5 0 0 1 .5-.5h11zm-11-1A1.5 1.5 0 0 0 1 3.5V12h14V3.5A1.5 1.5 0 0 0 13.5 2h-11zM0 12.5h16a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 0 12.5z"/>
+                                </svg>
+                            </div>
+                            <h5 class="card-title">Digital Skills</h5>
+                            <p class="card-text">Modern technology training to prepare students for the digital economy.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Photo Gallery Section -->
+    <section id="gallery" class="section-padding photo-gallery">
+        <div class="container">
+            <div class="text-center mb-5">
+                <h2 class="fw-bold">School Gallery</h2>
+                <p class="lead">Memorable moments from our school community</p>
+            </div>
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="photo-item">
+                        <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'><rect width='400' height='300' fill='%23e9ecef'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='16' fill='%236c757d'>Learners in Classroom</text></svg>" class="img-fluid" alt="Students in classroom">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="photo-item">
+                        <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'><rect width='400' height='300' fill='%23e9ecef'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='16' fill='%236c757d'>School Assembly</text></svg>" class="img-fluid" alt="School assembly">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="photo-item">
+                        <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'><rect width='400' height='300' fill='%23e9ecef'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='16' fill='%236c757d'>Sports Day</text></svg>" class="img-fluid" alt="Sports day activities">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="photo-item">
+                        <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'><rect width='400' height='300' fill='%23e9ecef'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='16' fill='%236c757d'>Library Study</text></svg>" class="img-fluid" alt="Students studying in library">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="photo-item">
+                        <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'><rect width='400' height='300' fill='%23e9ecef'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='16' fill='%236c757d'>Science Lab</text></svg>" class="img-fluid" alt="Science laboratory">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="photo-item">
+                        <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'><rect width='400' height='300' fill='%23e9ecef'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='16' fill='%236c757d'>Graduation</text></svg>" class="img-fluid" alt="Graduation ceremony">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Stats Section -->
+    <section class="section-padding stats-section">
+        <div class="container">
+            <div class="text-center mb-5">
+                <h2 class="fw-bold">Our Achievements</h2>
+                <p class="lead">Excellence in education and student outcomes</p>
+            </div>
+            <div class="row text-center g-4">
+                <div class="col-md-3 col-6">
+                    <div class="card border-0">
+                        <div class="card-body">
+                            <h3 class="text-primary fw-bold">98%</h3>
+                            <p class="text-muted">Pass Rate</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="card border-0">
+                        <div class="card-body">
+                            <h3 class="text-success fw-bold">15+</h3>
+                            <p class="text-muted">Years Experience</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="card border-0">
+                        <div class="card-body">
+                            <h3 class="text-info fw-bold">95%</h3>
+                            <p class="text-muted">Graduation Rate</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="card border-0">
+                        <div class="card-body">
+                            <h3 class="text-warning fw-bold">200+</h3>
+                            <p class="text-muted">Alumni Success</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Call to Action -->
+    <section class="section-padding bg-primary text-white">
+        <div class="container text-center">
+            <h2 class="fw-bold">Ready to Join Our Community?</h2>
+            <p class="lead mb-4">Enroll today and start your journey towards academic excellence</p>
+            <a href="/login" class="btn btn-light btn-lg me-3">Student Login</a>
+            <a href="#contact" class="btn btn-outline-light btn-lg">Contact Us</a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer bg-dark text-light py-5" id="contact">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-4 mb-4">
+                    <h5>Dzaleka CDSS School</h5>
+                    <p>Excellence in Education, Innovation in Learning</p>
+                    <p><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-geo-alt me-2" viewBox="0 0 16 16">
+                        <path d="M12.166 8.94c-.524 1.062-1.234 2.12-2.564 2.12-1.378 0-2.053-.984-2.053-2.12 0-1.14.675-2.12 2.053-2.12 1.33.001 2.04.954 2.04 2.12 0 1.14-.679 2.12-2.04 2.12zm-.543-5.474a4.27 4.27 0 0 0-2.632-.848 4.27 4.27 0 0 0-2.633.848c-.47.322-1.304 1.306-1.695 2.992-.395 1.698.287 2.992 1.695 2.992h6.263c1.408 0 2.09-1.294 1.695-2.992-.391-1.686-1.225-2.67-1.695-2.992z"/>
+                    </svg> Dzaleka, Malawi</p>
+                    <p><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-telephone me-2" viewBox="0 0 16 16">
+                        <path d="M3.654 1.328a.678.678 0 0 0-1.015-.063L1.605 2.3c-.483.484-.661 1.169-.45 1.77a17.568 17.568 0 0 0 4.168 6.608 17.569 17.569 0 0 0 6.608 4.168c.601.211 1.286.033 1.77-.45l1.034-1.034a.678.678 0 0 0-.063-1.015l-2.307-1.794a.678.678 0 0 0-.58-.122l-2.19.547a.678.678 0 0 0-.383.383l-.547 2.19a.678.678 0 0 0-.122.58l1.794 2.307c.42.562.258 1.414-.354 1.77l-1.034 1.034c-.6.563-1.497.726-2.06.32-6.51-4.12-7.25-11.03-1.14-14.88z"/>
+                    </svg> +265 XXX XXX XXX</p>
+                    <p><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-envelope me-2" viewBox="0 0 16 16">
+                        <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4Zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1H2Zm13 2.383-4.708 2.825L15 11.105V5.383Zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741ZM1 11.105l4.708-2.897L1 5.383v5.722Z"/>
+                    </svg> info@dzalekacdss.edu.mw</p>
+                </div>
+                <div class="col-md-4 mb-4">
+                    <h5>Quick Links</h5>
+                    <ul class="list-unstyled">
+                        <li><a href="/" class="text-light text-decoration-none">Home</a></li>
+                        <li><a href="#about" class="text-light text-decoration-none">About Us</a></li>
+                        <li><a href="#gallery" class="text-light text-decoration-none">Gallery</a></li>
+                        <li><a href="/login" class="text-light text-decoration-none">Student Portal</a></li>
+                        <li><a href="/teacher" class="text-light text-decoration-none">Teacher Portal</a></li>
+                        <li><a href="/staff" class="text-light text-decoration-none">Staff Portal</a></li>
+                    </ul>
+                </div>
+                <div class="col-md-4 mb-4">
+                    <h5>Newsletter</h5>
+                    <p>Subscribe to receive updates and news</p>
+                    <div class="input-group">
+                        <input type="email" class="form-control" placeholder="Your Email">
+                        <button class="btn btn-primary" type="button">Subscribe</button>
+                    </div>
+                </div>
+            </div>
+            <hr class="my-4">
+            <div class="text-center">
+                <p>&copy; 2026 Dzaleka CDSS School. All rights reserved.</p>
+            </div>
         </div>
     </footer>
 
