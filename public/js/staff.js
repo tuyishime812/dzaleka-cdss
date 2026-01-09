@@ -187,6 +187,11 @@ async function loadAnnouncements() {
             const announcements = await response.json();
             const announcementsContainer = document.getElementById('announcements');
 
+            if (!announcementsContainer) {
+                console.error('Announcements container not found');
+                return;
+            }
+
             if (announcements.length === 0) {
                 announcementsContainer.innerHTML = '<p>No announcements found</p>';
                 return;

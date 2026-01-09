@@ -1,0 +1,15 @@
+[2026-01-09T08:11:56.004Z] Starting server...
+[2026-01-09T08:11:56.060Z] Database path: C:\Users\Student.LAPTOP-46MOQA5A\Desktop\dzaleka-2\dzaleka-cdss\database.db
+[2026-01-09T08:11:56.083Z] Creating tables...
+[2026-01-09T08:11:56.121Z] App initialized
+[2026-01-09T08:11:56.134Z] About to start server...
+[2026-01-09T08:11:56.172Z] Server error: listen EADDRINUSE: address already in use :::3000
+[2026-01-09T08:11:56.177Z] Database connected successfully
+[2026-01-09T08:11:56.411Z] Users table created or exists
+[2026-01-09T08:11:56.594Z] Students table created or exists
+[2026-01-09T08:11:56.609Z] Password hashed successfully
+[2026-01-09T08:11:56.614Z] Teachers table created or exists
+[2026-01-09T08:11:56.630Z] Error creating grades table: SQLITE_ERROR: near "created_at": syntax error
+[2026-01-09T08:11:56.641Z] Announcements table created or exists
+[2026-01-09T08:11:56.662Z] Default admin user checked/created
+[2026-01-09T08:12:26.178Z] Server is still running after 30 seconds

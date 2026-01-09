@@ -10,7 +10,13 @@ console.log('Starting server setup...');
 
 // Database initialization
 const dbPath = path.join(__dirname, 'database.db');
-const db = new sqlite3.Database(dbPath);
+const db = new sqlite3.Database(dbPath, (err) => {
+  if (err) {
+    console.error('Error connecting to database:', err);
+  } else {
+    console.log('Connected to database successfully');
+  }
+});
 
 // Create tables if they don't exist
 db.serialize(() => {
@@ -24,7 +30,9 @@ db.serialize(() => {
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL, -- 'student', 'staff'
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
+  )`, (err) => {
+    if (err) console.error('Error creating users table:', err);
+  });
 
   // Students table
   db.run(`CREATE TABLE IF NOT EXISTS students (
@@ -34,7 +42,9 @@ db.serialize(() => {
     email TEXT UNIQUE NOT NULL,
     class TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
+  )`, (err) => {
+    if (err) console.error('Error creating students table:', err);
+  });
 
   // Grades table
   db.run(`CREATE TABLE IF NOT EXISTS grades (
@@ -47,7 +57,9 @@ db.serialize(() => {
     teacher_id INTEGER,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (teacher_id) REFERENCES users(id)
-  )`);
+  )`, (err) => {
+    if (err) console.error('Error creating grades table:', err);
+  });
 
   // Announcements table
   db.run(`CREATE TABLE IF NOT EXISTS announcements (
@@ -57,7 +69,9 @@ db.serialize(() => {
     date DATE NOT NULL,
     author_name TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
+  )`, (err) => {
+    if (err) console.error('Error creating announcements table:', err);
+  });
 
   // Insert default staff users
   const saltRounds = 10;

@@ -17,8 +17,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     },
                     body: JSON.stringify({
                         username: username,
-                        password: password,
-                        userType: userType
+                        password: password
                     })
                 });
                 
@@ -27,22 +26,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Store the token in localStorage
                     localStorage.setItem('token', result.token);
-                    
+
                     // Store user info
                     localStorage.setItem('userId', result.user.id);
                     localStorage.setItem('username', result.user.username);
                     localStorage.setItem('role', result.user.role);
-                    
+
+                    // For students, we'll use their username as their student ID
+                    if (result.user.role === 'student') {
+                        localStorage.setItem('studentId', result.user.username);
+                    }
+
                     // Redirect based on user role
                     switch(result.user.role) {
                         case 'student':
                             window.location.href = '/student';
                             break;
-                        case 'teacher':
-                            window.location.href = '/teacher';
-                            break;
                         case 'staff':
-                        case 'admin':
                             window.location.href = '/staff';
                             break;
                         default:

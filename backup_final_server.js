@@ -6,23 +6,19 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
-console.log('Starting server setup...');
-
 // Database initialization
 const dbPath = path.join(__dirname, 'database.db');
 const db = new sqlite3.Database(dbPath);
 
 // Create tables if they don't exist
 db.serialize(() => {
-  console.log('Setting up database tables...');
-  
   // Users table
   db.run(`CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
-    role TEXT NOT NULL, -- 'student', 'staff'
+    role TEXT NOT NULL, -- 'student', 'teacher', 'staff', 'admin'
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
@@ -36,6 +32,16 @@ db.serialize(() => {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
+  // Teachers table
+  db.run(`CREATE TABLE IF NOT EXISTS teachers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    teacher_id TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    subject TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
   // Grades table
   db.run(`CREATE TABLE IF NOT EXISTS grades (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,7 +52,7 @@ db.serialize(() => {
     date DATE NOT NULL,
     teacher_id INTEGER,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (teacher_id) REFERENCES users(id)
+    FOREIGN KEY (teacher_id) REFERENCES teachers(id)
   )`);
 
   // Announcements table
@@ -59,117 +65,25 @@ db.serialize(() => {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
-  // Insert default staff users
+  // Insert default admin user if none exists
   const saltRounds = 10;
-  
-  // Hash passwords for staff
-  bcrypt.hash('staff123', saltRounds, (err, staffHash1) => {
+  const defaultPassword = 'admin123';
+  bcrypt.hash(defaultPassword, saltRounds, (err, hash) => {
     if (err) {
-      console.error('Error hashing staff password:', err);
+      console.error('Error hashing default password:', err);
     } else {
       db.run(
         `INSERT OR IGNORE INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)`,
-        ['emmanuel', 'emmanuel@staff.edu', staffHash1, 'staff'],
+        ['admin', 'admin@school.edu', hash, 'admin'],
         function(err) {
           if (err) {
-            console.error('Error inserting emmanuel staff:', err);
+            console.error('Error inserting default admin:', err);
           } else {
-            console.log('Emmanuel staff user checked/created');
+            console.log('Default admin user checked/created');
           }
         }
       );
     }
-    
-    bcrypt.hash('staff123', saltRounds, (err, staffHash2) => {
-      if (err) {
-        console.error('Error hashing staff password:', err);
-      } else {
-        db.run(
-          `INSERT OR IGNORE INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)`,
-          ['tuyishime', 'tuyishime@staff.edu', staffHash2, 'staff'],
-          function(err) {
-            if (err) {
-              console.error('Error inserting tuyishime staff:', err);
-            } else {
-              console.log('Tuyishime staff user checked/created');
-            }
-          }
-        );
-      }
-    });
-  });
-  
-  // Hash passwords for students
-  bcrypt.hash('student123', saltRounds, (err, studentHash1) => {
-    if (err) {
-      console.error('Error hashing student password:', err);
-    } else {
-      db.run(
-        `INSERT OR IGNORE INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)`,
-        ['martin', 'martin@student.edu', studentHash1, 'student'],
-        function(err) {
-          if (err) {
-            console.error('Error inserting martin student:', err);
-          } else {
-            console.log('Martin student user checked/created');
-          }
-        }
-      );
-    }
-    
-    bcrypt.hash('student123', saltRounds, (err, studentHash2) => {
-      if (err) {
-        console.error('Error hashing student password:', err);
-      } else {
-        db.run(
-          `INSERT OR IGNORE INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)`,
-          ['shift', 'shift@student.edu', studentHash2, 'student'],
-          function(err) {
-            if (err) {
-              console.error('Error inserting shift student:', err);
-            } else {
-              console.log('Shift student user checked/created');
-            }
-          }
-        );
-      }
-      
-      bcrypt.hash('student123', saltRounds, (err, studentHash3) => {
-        if (err) {
-          console.error('Error hashing student password:', err);
-        } else {
-          db.run(
-            `INSERT OR IGNORE INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)`,
-            ['emmanuel_student', 'emmanuel_student@student.edu', studentHash3, 'student'],
-            function(err) {
-              if (err) {
-                console.error('Error inserting emmanuel student:', err);
-              } else {
-                console.log('Emmanuel student user checked/created');
-              }
-            }
-          );
-        }
-        
-        bcrypt.hash('student123', saltRounds, (err, studentHash4) => {
-          if (err) {
-            console.error('Error hashing student password:', err);
-          } else {
-            db.run(
-              `INSERT OR IGNORE INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)`,
-              ['tuyishime_student', 'tuyishime_student@student.edu', studentHash4, 'student'],
-              function(err) {
-                if (err) {
-                  console.error('Error inserting tuyishime student:', err);
-                } else {
-                  console.log('Tuyishime student user checked/created');
-                }
-              }
-            );
-          }
-        });
-      });
-    });
   });
 });
 
@@ -183,8 +97,6 @@ app.use(express.urlencoded({ extended: true }));
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
-
-console.log('Setting up middleware...');
 
 // Authentication middleware
 const authenticateToken = (req, res, next) => {
@@ -209,11 +121,11 @@ const authorizeRole = (roles) => {
     if (!req.user) {
       return res.status(401).json({ message: 'Authentication required' });
     }
-
+    
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({ message: 'Insufficient permissions' });
     }
-
+    
     next();
   };
 };
@@ -227,12 +139,20 @@ app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/login.html'));
 });
 
+app.get('/teacher', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/teacher.html'));
+});
+
 app.get('/student', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/student.html'));
 });
 
 app.get('/staff', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/staff.html'));
+});
+
+app.get('/logout', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/logout.html'));
 });
 
 // Authentication routes
@@ -244,7 +164,7 @@ app.post('/api/users/login', (req, res) => {
   }
 
   const query = 'SELECT id, username, password_hash, role FROM users WHERE username = ?';
-
+  
   db.get(query, [username], async (err, user) => {
     if (err) {
       console.error('Database error during login:', err);
@@ -271,10 +191,10 @@ app.post('/api/users/login', (req, res) => {
       res.json({
         message: 'Login successful',
         token: token,
-        user: {
-          id: user.id,
-          username: user.username,
-          role: user.role
+        user: { 
+          id: user.id, 
+          username: user.username, 
+          role: user.role 
         }
       });
     } catch (error) {
@@ -297,9 +217,9 @@ app.get('/api/grades/student/:studentId', authenticateToken, (req, res) => {
   }
 
   const query = `
-    SELECT g.id, g.subject, g.exam_type, g.grade, g.date, u.username as teacher_name
+    SELECT g.id, g.subject, g.exam_type, g.grade, g.date, t.name as teacher_name
     FROM grades g
-    LEFT JOIN users u ON g.teacher_id = u.id
+    LEFT JOIN teachers t ON g.teacher_id = t.id
     WHERE g.student_id = ?
     ORDER BY g.date DESC
   `;
@@ -314,41 +234,66 @@ app.get('/api/grades/student/:studentId', authenticateToken, (req, res) => {
   });
 });
 
-// Staff grades routes - staff can view all grades
-app.get('/api/grades/staff', authenticateToken, authorizeRole(['staff']), (req, res) => {
-  const query = `
-    SELECT g.id, g.student_id, s.name as student_name, g.subject, g.exam_type, g.grade, g.date
-    FROM grades g
-    LEFT JOIN students s ON g.student_id = s.student_id
-    ORDER BY g.date DESC
-  `;
+// Teacher grades routes
+app.get('/api/grades/teacher', authenticateToken, authorizeRole(['teacher']), (req, res) => {
+  // This would fetch grades associated with the logged-in teacher
+  // Since we're using user ID as teacher ID in this simplified implementation
+  const userId = req.user.id;
 
-  db.all(query, [], (err, rows) => {
+  // First, get the teacher record to confirm this user is linked to a teacher
+  const teacherQuery = 'SELECT id, teacher_id FROM teachers WHERE id = ?';
+  db.get(teacherQuery, [userId], (err, teacher) => {
     if (err) {
-      console.error('Database error fetching grades:', err);
+      console.error('Database error fetching teacher:', err);
       return res.status(500).json({ message: 'Database error' });
     }
 
-    res.json(rows);
+    if (!teacher) {
+      return res.status(404).json({ message: 'Teacher profile not found' });
+    }
+
+    const query = `
+      SELECT g.id, g.student_id, s.name as student_name, g.subject, g.exam_type, g.grade, g.date
+      FROM grades g
+      LEFT JOIN students s ON g.student_id = s.student_id
+      WHERE g.teacher_id = ?
+      ORDER BY g.date DESC
+    `;
+
+    db.all(query, [userId], (err, rows) => {
+      if (err) {
+        console.error('Database error fetching teacher grades:', err);
+        return res.status(500).json({ message: 'Database error' });
+      }
+
+      res.json(rows);
+    });
   });
 });
 
-app.post('/api/grades', authenticateToken, authorizeRole(['staff']), (req, res) => {
-  const { studentId, subject, examType, grade, date } = req.body;
+app.post('/api/grades', authenticateToken, authorizeRole(['teacher', 'staff']), (req, res) => {
+  const { studentId, subject, examType, grade, date, teacherId } = req.body;
 
   if (!studentId || !subject || !examType || grade === undefined || !date) {
     return res.status(400).json({ message: 'Missing required fields' });
   }
 
-  // Staff member who is adding the grade
-  const staffId = req.user.id;
+  // If teacherId is not provided, use the ID from the token
+  const actualTeacherId = teacherId || req.user.id;
+
+  // Verify that the requesting user has permission to add grades for this teacher ID
+  // For teachers, they can only add grades for themselves
+  // For staff/admin, they can add grades for any teacher
+  if (req.user.role === 'teacher' && actualTeacherId != req.user.id) {
+    return res.status(403).json({ message: 'Teachers can only add grades for themselves' });
+  }
 
   const query = `
     INSERT INTO grades (student_id, subject, exam_type, grade, date, teacher_id)
     VALUES (?, ?, ?, ?, ?, ?)
   `;
 
-  db.run(query, [studentId, subject, examType, grade, date, staffId], function(err) {
+  db.run(query, [studentId, subject, examType, grade, date, actualTeacherId], function(err) {
     if (err) {
       console.error('Database error inserting grade:', err);
       return res.status(500).json({ message: 'Database error' });
@@ -361,7 +306,7 @@ app.post('/api/grades', authenticateToken, authorizeRole(['staff']), (req, res) 
       exam_type: examType,
       grade: grade,
       date: date,
-      teacher_id: staffId,
+      teacher_id: actualTeacherId,
       message: 'Grade added successfully'
     });
   });
@@ -381,7 +326,7 @@ app.get('/api/students', authenticateToken, (req, res) => {
   });
 });
 
-app.post('/api/students', authenticateToken, authorizeRole(['staff']), (req, res) => {
+app.post('/api/students', authenticateToken, authorizeRole(['staff', 'admin']), (req, res) => {
   const { studentId, name, email, class: studentClass } = req.body;
 
   if (!studentId || !name || !email || !studentClass) {
@@ -399,24 +344,24 @@ app.post('/api/students', authenticateToken, authorizeRole(['staff']), (req, res
       return res.status(500).json({ message: 'Database error' });
     }
 
-    res.status(201).json({
-      id: this.lastID,
+    res.status(201).json({ 
+      id: this.lastID, 
       student_id: studentId,
       name: name,
       email: email,
       class: studentClass,
-      message: 'Student added successfully'
+      message: 'Student added successfully' 
     });
   });
 });
 
-// Staff routes
-app.get('/api/staff', authenticateToken, (req, res) => {
-  const query = 'SELECT id, username, email FROM users WHERE role = "staff" ORDER BY username';
+// Teachers routes
+app.get('/api/teachers', authenticateToken, (req, res) => {
+  const query = 'SELECT id, teacher_id, name, email, subject FROM teachers ORDER BY name';
 
   db.all(query, [], (err, rows) => {
     if (err) {
-      console.error('Database error fetching staff:', err);
+      console.error('Database error fetching teachers:', err);
       return res.status(500).json({ message: 'Database error' });
     }
 
@@ -424,13 +369,42 @@ app.get('/api/staff', authenticateToken, (req, res) => {
   });
 });
 
+app.post('/api/teachers', authenticateToken, authorizeRole(['staff', 'admin']), (req, res) => {
+  const { teacherId, name, email, subject } = req.body;
+
+  if (!teacherId || !name || !email || !subject) {
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  const query = `
+    INSERT INTO teachers (teacher_id, name, email, subject)
+    VALUES (?, ?, ?, ?)
+  `;
+
+  db.run(query, [teacherId, name, email, subject], function(err) {
+    if (err) {
+      console.error('Database error inserting teacher:', err);
+      return res.status(500).json({ message: 'Database error' });
+    }
+
+    res.status(201).json({ 
+      id: this.lastID, 
+      teacher_id: teacherId,
+      name: name,
+      email: email,
+      subject: subject,
+      message: 'Teacher added successfully' 
+    });
+  });
+});
+
 // Staff statistics routes
-app.get('/api/staff/statistics', authenticateToken, authorizeRole(['staff']), (req, res) => {
+app.get('/api/staff/statistics', authenticateToken, authorizeRole(['staff', 'admin']), (req, res) => {
   // Get counts from database
   const countsQuery = `
     SELECT 
       (SELECT COUNT(*) FROM students) as totalStudents,
-      (SELECT COUNT(*) FROM users WHERE role = 'staff') as totalStaff,
+      (SELECT COUNT(*) FROM teachers) as totalTeachers,
       (SELECT COUNT(DISTINCT class) FROM students) as totalClasses,
       (SELECT AVG(grade) FROM grades) as averageGrade
   `;
@@ -444,7 +418,7 @@ app.get('/api/staff/statistics', authenticateToken, authorizeRole(['staff']), (r
     // Ensure averageGrade is a number or 0 if null
     const stats = {
       totalStudents: row.totalStudents || 0,
-      totalStaff: row.totalStaff || 0,
+      totalTeachers: row.totalTeachers || 0,
       totalClasses: row.totalClasses || 0,
       averageGrade: row.averageGrade ? parseFloat(row.averageGrade.toFixed(2)) : 0
     };
@@ -467,7 +441,7 @@ app.get('/api/staff/announcements', authenticateToken, (req, res) => {
   });
 });
 
-app.post('/api/staff/announcements', authenticateToken, authorizeRole(['staff']), (req, res) => {
+app.post('/api/staff/announcements', authenticateToken, authorizeRole(['staff', 'admin']), (req, res) => {
   const { title, content, date } = req.body;
 
   if (!title || !content || !date) {
@@ -488,19 +462,19 @@ app.post('/api/staff/announcements', authenticateToken, authorizeRole(['staff'])
       return res.status(500).json({ message: 'Database error' });
     }
 
-    res.status(201).json({
-      id: this.lastID,
+    res.status(201).json({ 
+      id: this.lastID, 
       title: title,
       content: content,
       date: date,
       author_name: authorName,
-      message: 'Announcement posted successfully'
+      message: 'Announcement posted successfully' 
     });
   });
 });
 
 // PUT and DELETE routes for announcements
-app.put('/api/staff/announcements/:id', authenticateToken, authorizeRole(['staff']), (req, res) => {
+app.put('/api/staff/announcements/:id', authenticateToken, authorizeRole(['staff', 'admin']), (req, res) => {
   const { id } = req.params;
   const { title, content, date } = req.body;
 
@@ -509,7 +483,7 @@ app.put('/api/staff/announcements/:id', authenticateToken, authorizeRole(['staff
   }
 
   const query = `
-    UPDATE announcements
+    UPDATE announcements 
     SET title = ?, content = ?, date = ?
     WHERE id = ?
   `;
@@ -528,7 +502,7 @@ app.put('/api/staff/announcements/:id', authenticateToken, authorizeRole(['staff
   });
 });
 
-app.delete('/api/staff/announcements/:id', authenticateToken, authorizeRole(['staff']), (req, res) => {
+app.delete('/api/staff/announcements/:id', authenticateToken, authorizeRole(['staff', 'admin']), (req, res) => {
   const { id } = req.params;
 
   const query = 'DELETE FROM announcements WHERE id = ?';
