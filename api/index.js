@@ -130,10 +130,12 @@ const initializeDefaultUsers = async () => {
 
     if (row.count === 0) {
       // Hash passwords and insert default users
+      const adminHash = bcrypt.hashSync('admin123', 10);
       const staffHash = bcrypt.hashSync('staff123', 10);
       const studentHash = bcrypt.hashSync('student123', 10);
 
       const defaultUsers = [
+        { username: 'admin', email: 'admin@school.edu', password_hash: adminHash, role: 'admin' },
         { username: 'emmanuel', email: 'emmanuel@staff.edu', password_hash: staffHash, role: 'staff' },
         { username: 'tuyishime', email: 'tuyishime@staff.edu', password_hash: staffHash, role: 'staff' },
         { username: 'martin', email: 'martin@student.edu', password_hash: studentHash, role: 'student' },
@@ -257,6 +259,14 @@ const authorizeRole = (roles) => {
   };
 };
 
+// Special middleware for admin access
+const requireAdmin = (req, res, next) => {
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Administrative access required' });
+  }
+  next();
+};
+
 // Main routes - serve HTML files
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
@@ -272,6 +282,10 @@ app.get('/student', (req, res) => {
 
 app.get('/staff', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/staff.html'));
+});
+
+app.get('/admin', authenticateToken, requireAdmin, (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/admin.html'));
 });
 
 // Authentication routes
@@ -1047,6 +1061,320 @@ app.post('/api/users/logout', authenticateToken, (req, res) => {
   }
 
   res.json({ message: 'Logged out successfully' });
+});
+
+// Admin routes for user management
+app.get('/api/admin/users', authenticateToken, requireAdmin, (req, res) => {
+  const query = "SELECT id, username, email, role, created_at FROM users ORDER BY created_at DESC";
+
+  db.all(query, [], (err, rows) => {
+    if (err) {
+      console.error('Database error fetching users:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+
+    res.json(rows);
+  });
+});
+
+app.post('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
+  const { username, email, role, password } = req.body;
+
+  if (!username || !email || !role || !password) {
+    return res.status(400).json({ message: 'Username, email, role, and password are required' });
+  }
+
+  // Validate and sanitize inputs
+  const sanitizedUsername = validator.escape(username.toString().trim());
+  const sanitizedEmail = validator.escape(email.toString().trim());
+  const sanitizedRole = validator.escape(role.toString().trim());
+
+  // Validate role
+  if (!['student', 'staff', 'admin'].includes(sanitizedRole)) {
+    return res.status(400).json({ message: 'Invalid role. Must be student, staff, or admin' });
+  }
+
+  // Validate email
+  if (!validator.isEmail(sanitizedEmail)) {
+    return res.status(400).json({ message: 'Invalid email format' });
+  }
+
+  // Validate password strength
+  if (password.length < 8) {
+    return res.status(400).json({ message: 'Password must be at least 8 characters long' });
+  }
+
+  if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
+    return res.status(400).json({ message: 'Password must contain at least one uppercase letter, one lowercase letter, and one number' });
+  }
+
+  // Check if user already exists
+  db.get("SELECT id FROM users WHERE username = ? OR email = ?", [sanitizedUsername, sanitizedEmail], (err, existingUser) => {
+    if (err) {
+      console.error('Database error checking existing user:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+
+    if (existingUser) {
+      return res.status(409).json({ message: 'User with this username or email already exists' });
+    }
+
+    // Hash the password
+    const hashedPassword = bcrypt.hashSync(password, 12);
+
+    // Insert the new user into the database
+    const query = "INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)";
+
+    db.run(query, [sanitizedUsername, sanitizedEmail, hashedPassword, sanitizedRole], function(err) {
+      if (err) {
+        console.error('Database error inserting user:', err);
+        return res.status(500).json({ message: 'Internal server error' });
+      }
+
+      // Return the newly created user (without password hash)
+      const newUser = {
+        id: this.lastID,
+        username: sanitizedUsername,
+        email: sanitizedEmail,
+        role: sanitizedRole
+      };
+
+      res.status(201).json({
+        ...newUser,
+        message: 'User created successfully'
+      });
+    });
+  });
+});
+
+app.put('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { username, email, role } = req.body;
+
+  if (!username || !email || !role) {
+    return res.status(400).json({ message: 'Username, email, and role are required' });
+  }
+
+  // Validate and sanitize inputs
+  const sanitizedId = parseInt(id);
+  const sanitizedUsername = validator.escape(username.toString().trim());
+  const sanitizedEmail = validator.escape(email.toString().trim());
+  const sanitizedRole = validator.escape(role.toString().trim());
+
+  // Validate role
+  if (!['student', 'staff', 'admin'].includes(sanitizedRole)) {
+    return res.status(400).json({ message: 'Invalid role. Must be student, staff, or admin' });
+  }
+
+  // Validate email
+  if (!validator.isEmail(sanitizedEmail)) {
+    return res.status(400).json({ message: 'Invalid email format' });
+  }
+
+  if (isNaN(sanitizedId) || sanitizedId <= 0) {
+    return res.status(400).json({ message: 'Invalid user ID' });
+  }
+
+  // Check if user exists
+  db.get("SELECT id FROM users WHERE id = ?", [sanitizedId], (err, user) => {
+    if (err) {
+      console.error('Database error checking user:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Check if another user with the same username or email exists (excluding current user)
+    db.get("SELECT id FROM users WHERE (username = ? OR email = ?) AND id != ?", [sanitizedUsername, sanitizedEmail, sanitizedId], (err, existingUser) => {
+      if (err) {
+        console.error('Database error checking existing user:', err);
+        return res.status(500).json({ message: 'Internal server error' });
+      }
+
+      if (existingUser) {
+        return res.status(409).json({ message: 'Another user with this username or email already exists' });
+      }
+
+      // Update the user in the database
+      const query = "UPDATE users SET username = ?, email = ?, role = ? WHERE id = ?";
+
+      db.run(query, [sanitizedUsername, sanitizedEmail, sanitizedRole, sanitizedId], function(err) {
+        if (err) {
+          console.error('Database error updating user:', err);
+          return res.status(500).json({ message: 'Internal server error' });
+        }
+
+        if (this.changes === 0) {
+          return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Return the updated user
+        const updatedUser = {
+          id: sanitizedId,
+          username: sanitizedUsername,
+          email: sanitizedEmail,
+          role: sanitizedRole
+        };
+
+        res.json({
+          ...updatedUser,
+          message: 'User updated successfully'
+        });
+      });
+    });
+  });
+});
+
+app.delete('/api/admin/users/:id', authenticateToken, requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const sanitizedId = parseInt(id);
+
+  if (isNaN(sanitizedId) || sanitizedId <= 0) {
+    return res.status(400).json({ message: 'Invalid user ID' });
+  }
+
+  // Prevent admin from deleting themselves
+  if (sanitizedId === req.user.id) {
+    return res.status(400).json({ message: 'Cannot delete your own account' });
+  }
+
+  // Delete the user from the database
+  const query = "DELETE FROM users WHERE id = ?";
+
+  db.run(query, [sanitizedId], function(err) {
+    if (err) {
+      console.error('Database error deleting user:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+
+    if (this.changes === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ message: 'User deleted successfully' });
+  });
+});
+
+// Grade analytics and reporting routes
+app.get('/api/admin/grade-analytics', authenticateToken, requireAdmin, (req, res) => {
+  // Get comprehensive grade analytics
+  const query = `
+    SELECT
+      s.name as student_name,
+      g.subject,
+      g.exam_type,
+      g.grade,
+      g.date,
+      u.username as teacher_name
+    FROM grades g
+    LEFT JOIN students s ON g.student_id = s.student_id
+    LEFT JOIN users u ON g.teacher_id = u.id
+    ORDER BY g.date DESC
+    LIMIT 100
+  `;
+
+  db.all(query, [], (err, rows) => {
+    if (err) {
+      console.error('Database error fetching grade analytics:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+
+    res.json(rows);
+  });
+});
+
+app.get('/api/admin/grade-summary', authenticateToken, requireAdmin, (req, res) => {
+  // Get grade summary statistics
+  const summaryQuery = `
+    SELECT
+      COUNT(*) as total_grades,
+      AVG(grade) as average_grade,
+      MIN(grade) as min_grade,
+      MAX(grade) as max_grade,
+      COUNT(DISTINCT subject) as total_subjects,
+      COUNT(DISTINCT student_id) as total_students
+    FROM grades
+  `;
+
+  const subjectAvgQuery = `
+    SELECT
+      subject,
+      AVG(grade) as avg_grade,
+      COUNT(*) as grade_count
+    FROM grades
+    GROUP BY subject
+    ORDER BY avg_grade DESC
+  `;
+
+  const studentAvgQuery = `
+    SELECT
+      s.name as student_name,
+      s.student_id,
+      AVG(g.grade) as avg_grade,
+      COUNT(g.id) as total_grades
+    FROM students s
+    LEFT JOIN grades g ON s.student_id = g.student_id
+    GROUP BY s.student_id
+    HAVING total_grades > 0
+    ORDER BY avg_grade DESC
+    LIMIT 10
+  `;
+
+  // Execute all queries
+  db.get(summaryQuery, [], (err, summary) => {
+    if (err) {
+      console.error('Database error fetching grade summary:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+
+    db.all(subjectAvgQuery, [], (err, subjectAverages) => {
+      if (err) {
+        console.error('Database error fetching subject averages:', err);
+        return res.status(500).json({ message: 'Internal server error' });
+      }
+
+      db.all(studentAvgQuery, [], (err, topStudents) => {
+        if (err) {
+          console.error('Database error fetching top students:', err);
+          return res.status(500).json({ message: 'Internal server error' });
+        }
+
+        const result = {
+          summary: summary,
+          subject_averages: subjectAverages,
+          top_students: topStudents
+        };
+
+        res.json(result);
+      });
+    });
+  });
+});
+
+// Grade trend analysis
+app.get('/api/admin/grade-trends', authenticateToken, requireAdmin, (req, res) => {
+  // Get grade trends over time
+  const trendsQuery = `
+    SELECT
+      DATE(date) as date,
+      AVG(grade) as avg_grade,
+      COUNT(*) as grade_count
+    FROM grades
+    GROUP BY DATE(date)
+    ORDER BY date DESC
+    LIMIT 30
+  `;
+
+  db.all(trendsQuery, [], (err, rows) => {
+    if (err) {
+      console.error('Database error fetching grade trends:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+
+    res.json(rows);
+  });
 });
 
 // Password change route
