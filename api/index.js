@@ -4,6 +4,7 @@ const path = require('path');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const sqlite3 = require('sqlite3').verbose();
 require('dotenv').config();
 
 // Create Express app
@@ -17,38 +18,134 @@ app.use(express.urlencoded({ extended: true }));
 // Serve static files from the public directory
 app.use(express.static(path.join(__dirname, '../public')));
 
-// In-memory storage for demo purposes (in production, use a real database)
-let users = [
-  { id: 1, username: 'emmanuel', email: 'emmanuel@staff.edu', password_hash: '', role: 'staff' },
-  { id: 2, username: 'tuyishime', email: 'tuyishime@staff.edu', password_hash: '', role: 'staff' },
-  { id: 3, username: 'martin', email: 'martin@student.edu', password_hash: '', role: 'student' },
-  { id: 4, username: 'shift', email: 'shift@student.edu', password_hash: '', role: 'student' },
-  { id: 5, username: 'emmanuel_student', email: 'emmanuel_student@student.edu', password_hash: '', role: 'student' },
-  { id: 6, username: 'tuyishime_student', email: 'tuyishime_student@student.edu', password_hash: '', role: 'student' }
-];
+// Initialize SQLite database
+const dbPath = path.join(__dirname, '../database.db');
+const db = new sqlite3.Database(dbPath, (err) => {
+  if (err) {
+    console.error('Error opening database:', err);
+  } else {
+    console.log('Connected to SQLite database');
 
-// Hash passwords for the default users
-const initializeUsers = async () => {
-  // Hash staff passwords
-  const staffHash = await bcrypt.hash('staff123', 10);
-  users[0].password_hash = staffHash;
-  users[1].password_hash = staffHash;
-  
-  // Hash student passwords
-  const studentHash = await bcrypt.hash('student123', 10);
-  users[2].password_hash = studentHash;
-  users[3].password_hash = studentHash;
-  users[4].password_hash = studentHash;
-  users[5].password_hash = studentHash;
+    // Create tables if they don't exist
+    db.run(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'student',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS students (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        class TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS subjects (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS grades (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        exam_type TEXT NOT NULL,
+        grade REAL NOT NULL,
+        date DATE NOT NULL,
+        teacher_id INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (teacher_id) REFERENCES users(id)
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS announcements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        date DATE NOT NULL,
+        author_name TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Initialize default users if they don't exist
+    initializeDefaultUsers();
+
+    // Initialize default subjects if they don't exist
+    initializeDefaultSubjects();
+  }
+});
+
+// Initialize default users
+const initializeDefaultUsers = async () => {
+  // Check if default users already exist
+  db.get("SELECT COUNT(*) as count FROM users", [], (err, row) => {
+    if (err) {
+      console.error('Error checking users:', err);
+      return;
+    }
+
+    if (row.count === 0) {
+      // Hash passwords and insert default users
+      const staffHash = bcrypt.hashSync('staff123', 10);
+      const studentHash = bcrypt.hashSync('student123', 10);
+
+      const defaultUsers = [
+        { username: 'emmanuel', email: 'emmanuel@staff.edu', password_hash: staffHash, role: 'staff' },
+        { username: 'tuyishime', email: 'tuyishime@staff.edu', password_hash: staffHash, role: 'staff' },
+        { username: 'martin', email: 'martin@student.edu', password_hash: studentHash, role: 'student' },
+        { username: 'shift', email: 'shift@student.edu', password_hash: studentHash, role: 'student' },
+        { username: 'emmanuel_student', email: 'emmanuel_student@student.edu', password_hash: studentHash, role: 'student' },
+        { username: 'tuyishime_student', email: 'tuyishime_student@student.edu', password_hash: studentHash, role: 'student' }
+      ];
+
+      const stmt = db.prepare("INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)");
+      defaultUsers.forEach(user => {
+        stmt.run([user.username, user.email, user.password_hash, user.role]);
+      });
+      stmt.finalize();
+      console.log('Default users inserted');
+    }
+  });
 };
 
-// Initialize users
-initializeUsers();
+// Initialize default subjects
+const initializeDefaultSubjects = () => {
+  // Check if default subjects already exist
+  db.get("SELECT COUNT(*) as count FROM subjects", [], (err, row) => {
+    if (err) {
+      console.error('Error checking subjects:', err);
+      return;
+    }
 
-// In-memory storage for other data
-let grades = [];
-let students = [];
-let announcements = [];
+    if (row.count === 0) {
+      const defaultSubjects = [
+        'Mathematics', 'English', 'Science', 'History', 'Geography'
+      ];
+
+      const stmt = db.prepare("INSERT INTO subjects (name) VALUES (?)");
+      defaultSubjects.forEach(subject => {
+        stmt.run([subject]);
+      });
+      stmt.finalize();
+      console.log('Default subjects inserted');
+    }
+  });
+};
 
 // Authentication middleware
 const authenticateToken = (req, res, next) => {
@@ -107,37 +204,44 @@ app.post('/api/users/login', async (req, res) => {
     return res.status(400).json({ message: 'Username and password are required' });
   }
 
-  const user = users.find(u => u.username === username);
-  if (!user) {
-    return res.status(401).json({ message: 'Invalid credentials' });
-  }
+  // Query the database for the user
+  db.get("SELECT * FROM users WHERE username = ?", [username], async (err, user) => {
+    if (err) {
+      console.error('Database error during login:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
 
-  try {
-    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
-    if (!isPasswordValid) {
+    if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Generate JWT token
-    const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role },
-      process.env.JWT_SECRET || 'fallback_secret_key',
-      { expiresIn: '24h' }
-    );
-
-    res.json({
-      message: 'Login successful',
-      token: token,
-      user: {
-        id: user.id,
-        username: user.username,
-        role: user.role
+    try {
+      const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+      if (!isPasswordValid) {
+        return res.status(401).json({ message: 'Invalid credentials' });
       }
-    });
-  } catch (error) {
-    console.error('Error during password comparison:', error);
-    res.status(500).json({ message: 'Authentication error' });
-  }
+
+      // Generate JWT token
+      const token = jwt.sign(
+        { id: user.id, username: user.username, role: user.role },
+        process.env.JWT_SECRET || 'fallback_secret_key',
+        { expiresIn: '24h' }
+      );
+
+      res.json({
+        message: 'Login successful',
+        token: token,
+        user: {
+          id: user.id,
+          username: user.username,
+          role: user.role
+        }
+      });
+    } catch (error) {
+      console.error('Error during password comparison:', error);
+      res.status(500).json({ message: 'Authentication error' });
+    }
+  });
 });
 
 // Student grades routes
@@ -152,33 +256,44 @@ app.get('/api/grades/student/:studentId', authenticateToken, (req, res) => {
     }
   }
 
-  // Filter grades for the specific student
-  const studentGrades = grades.filter(grade => grade.student_id === studentId);
+  // Query the database for grades for the specific student
+  const query = `
+    SELECT g.*, u.username as teacher_name
+    FROM grades g
+    LEFT JOIN users u ON g.teacher_id = u.id
+    WHERE g.student_id = ?
+    ORDER BY g.created_at DESC
+  `;
 
-  // Add teacher names to grades
-  const gradesWithTeachers = studentGrades.map(grade => {
-    const teacher = users.find(user => user.id === grade.teacher_id);
-    return {
-      ...grade,
-      teacher_name: teacher ? teacher.username : 'N/A'
-    };
+  db.all(query, [studentId], (err, rows) => {
+    if (err) {
+      console.error('Database error fetching student grades:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+
+    res.json(rows);
   });
-
-  res.json(gradesWithTeachers);
 });
 
 // Staff grades routes - staff can view all grades
 app.get('/api/grades/staff', authenticateToken, authorizeRole(['staff']), (req, res) => {
-  // Add student names to grades
-  const gradesWithInfo = grades.map(grade => {
-    const student = students.find(s => s.student_id === grade.student_id);
-    return {
-      ...grade,
-      student_name: student ? student.name : 'N/A'
-    };
-  });
+  // Query the database for all grades with student information
+  const query = `
+    SELECT g.*, s.name as student_name, u.username as teacher_name
+    FROM grades g
+    LEFT JOIN students s ON g.student_id = s.student_id
+    LEFT JOIN users u ON g.teacher_id = u.id
+    ORDER BY g.created_at DESC
+  `;
 
-  res.json(gradesWithInfo);
+  db.all(query, [], (err, rows) => {
+    if (err) {
+      console.error('Database error fetching all grades:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+
+    res.json(rows);
+  });
 });
 
 app.post('/api/grades', authenticateToken, authorizeRole(['staff']), (req, res) => {
@@ -191,21 +306,33 @@ app.post('/api/grades', authenticateToken, authorizeRole(['staff']), (req, res) 
   // Staff member who is adding the grade
   const staffId = req.user.id;
 
-  const newGrade = {
-    id: grades.length + 1,
-    student_id: studentId,
-    subject: subject,
-    exam_type: examType,
-    grade: grade,
-    date: date,
-    teacher_id: staffId
-  };
+  // Insert the new grade into the database
+  const query = `
+    INSERT INTO grades (student_id, subject, exam_type, grade, date, teacher_id)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `;
 
-  grades.push(newGrade);
+  db.run(query, [studentId, subject, examType, grade, date, staffId], function(err) {
+    if (err) {
+      console.error('Database error inserting grade:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
 
-  res.status(201).json({
-    ...newGrade,
-    message: 'Grade added successfully'
+    // Return the newly created grade
+    const newGrade = {
+      id: this.lastID,
+      student_id: studentId,
+      subject: subject,
+      exam_type: examType,
+      grade: grade,
+      date: date,
+      teacher_id: staffId
+    };
+
+    res.status(201).json({
+      ...newGrade,
+      message: 'Grade added successfully'
+    });
   });
 });
 
@@ -218,23 +345,37 @@ app.put('/api/grades/:id', authenticateToken, authorizeRole(['staff']), (req, re
     return res.status(400).json({ message: 'Missing required fields' });
   }
 
-  const gradeIndex = grades.findIndex(g => g.id == id);
-  if (gradeIndex === -1) {
-    return res.status(404).json({ message: 'Grade not found' });
-  }
+  // Update the grade in the database
+  const query = `
+    UPDATE grades
+    SET student_id = ?, subject = ?, exam_type = ?, grade = ?, date = ?
+    WHERE id = ?
+  `;
 
-  grades[gradeIndex] = {
-    ...grades[gradeIndex],
-    student_id: studentId,
-    subject: subject,
-    exam_type: examType,
-    grade: grade,
-    date: date
-  };
+  db.run(query, [studentId, subject, examType, grade, date, id], function(err) {
+    if (err) {
+      console.error('Database error updating grade:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
 
-  res.json({
-    ...grades[gradeIndex],
-    message: 'Grade updated successfully'
+    if (this.changes === 0) {
+      return res.status(404).json({ message: 'Grade not found' });
+    }
+
+    // Return the updated grade
+    const updatedGrade = {
+      id: parseInt(id),
+      student_id: studentId,
+      subject: subject,
+      exam_type: examType,
+      grade: grade,
+      date: date
+    };
+
+    res.json({
+      ...updatedGrade,
+      message: 'Grade updated successfully'
+    });
   });
 });
 
@@ -242,19 +383,36 @@ app.put('/api/grades/:id', authenticateToken, authorizeRole(['staff']), (req, re
 app.delete('/api/grades/:id', authenticateToken, authorizeRole(['staff']), (req, res) => {
   const { id } = req.params;
 
-  const gradeIndex = grades.findIndex(g => g.id == id);
-  if (gradeIndex === -1) {
-    return res.status(404).json({ message: 'Grade not found' });
-  }
+  // Delete the grade from the database
+  const query = "DELETE FROM grades WHERE id = ?";
 
-  grades.splice(gradeIndex, 1);
+  db.run(query, [id], function(err) {
+    if (err) {
+      console.error('Database error deleting grade:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
 
-  res.json({ message: 'Grade deleted successfully' });
+    if (this.changes === 0) {
+      return res.status(404).json({ message: 'Grade not found' });
+    }
+
+    res.json({ message: 'Grade deleted successfully' });
+  });
 });
 
 // Students routes
 app.get('/api/students', authenticateToken, (req, res) => {
-  res.json(students);
+  // Query the database for all students
+  const query = "SELECT * FROM students ORDER BY created_at DESC";
+
+  db.all(query, [], (err, rows) => {
+    if (err) {
+      console.error('Database error fetching students:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+
+    res.json(rows);
+  });
 });
 
 app.post('/api/students', authenticateToken, authorizeRole(['staff']), (req, res) => {
@@ -264,51 +422,108 @@ app.post('/api/students', authenticateToken, authorizeRole(['staff']), (req, res
     return res.status(400).json({ message: 'Missing required fields' });
   }
 
-  const newStudent = {
-    id: students.length + 1,
-    student_id: studentId,
-    name: name,
-    email: email,
-    class: studentClass
-  };
+  // Insert the new student into the database
+  const query = "INSERT INTO students (student_id, name, email, class) VALUES (?, ?, ?, ?)";
 
-  students.push(newStudent);
+  db.run(query, [studentId, name, email, studentClass], function(err) {
+    if (err) {
+      console.error('Database error inserting student:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
 
-  res.status(201).json({
-    ...newStudent,
-    message: 'Student added successfully'
+    // Return the newly created student
+    const newStudent = {
+      id: this.lastID,
+      student_id: studentId,
+      name: name,
+      email: email,
+      class: studentClass
+    };
+
+    res.status(201).json({
+      ...newStudent,
+      message: 'Student added successfully'
+    });
   });
 });
 
 // Staff routes
 app.get('/api/staff', authenticateToken, (req, res) => {
-  const staffUsers = users.filter(user => user.role === 'staff');
-  const staffList = staffUsers.map(user => ({
-    id: user.id,
-    username: user.username,
-    email: user.email
-  }));
-  
-  res.json(staffList);
+  // Query the database for all staff users
+  const query = "SELECT id, username, email FROM users WHERE role = 'staff'";
+
+  db.all(query, [], (err, rows) => {
+    if (err) {
+      console.error('Database error fetching staff:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+
+    res.json(rows);
+  });
 });
 
 // Staff statistics routes
 app.get('/api/staff/statistics', authenticateToken, authorizeRole(['staff']), (req, res) => {
-  const stats = {
-    totalStudents: students.length,
-    totalStaff: users.filter(u => u.role === 'staff').length,
-    totalClasses: [...new Set(students.map(s => s.class))].length,
-    averageGrade: grades.length > 0 
-      ? parseFloat((grades.reduce((sum, g) => sum + g.grade, 0) / grades.length).toFixed(2))
-      : 0
+  // Get counts from the database
+  const queries = {
+    totalStudents: "SELECT COUNT(*) as count FROM students",
+    totalStaff: "SELECT COUNT(*) as count FROM users WHERE role = 'staff'",
+    totalClasses: "SELECT COUNT(DISTINCT class) as count FROM students",
+    averageGrade: "SELECT AVG(grade) as avg_grade FROM grades"
   };
 
-  res.json(stats);
+  // Execute all queries
+  db.get(queries.totalStudents, [], (err, studentsRow) => {
+    if (err) {
+      console.error('Database error getting student count:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+
+    db.get(queries.totalStaff, [], (err, staffRow) => {
+      if (err) {
+        console.error('Database error getting staff count:', err);
+        return res.status(500).json({ message: 'Internal server error' });
+      }
+
+      db.get(queries.totalClasses, [], (err, classesRow) => {
+        if (err) {
+          console.error('Database error getting class count:', err);
+          return res.status(500).json({ message: 'Internal server error' });
+        }
+
+        db.get(queries.averageGrade, [], (err, gradeRow) => {
+          if (err) {
+            console.error('Database error getting average grade:', err);
+            return res.status(500).json({ message: 'Internal server error' });
+          }
+
+          const stats = {
+            totalStudents: studentsRow.count,
+            totalStaff: staffRow.count,
+            totalClasses: classesRow.count,
+            averageGrade: gradeRow.avg_grade ? parseFloat(gradeRow.avg_grade.toFixed(2)) : 0
+          };
+
+          res.json(stats);
+        });
+      });
+    });
+  });
 });
 
 // Announcements routes
 app.get('/api/staff/announcements', authenticateToken, (req, res) => {
-  res.json(announcements);
+  // Query the database for all announcements
+  const query = "SELECT * FROM announcements ORDER BY created_at DESC";
+
+  db.all(query, [], (err, rows) => {
+    if (err) {
+      console.error('Database error fetching announcements:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+
+    res.json(rows);
+  });
 });
 
 app.post('/api/staff/announcements', authenticateToken, authorizeRole(['staff']), (req, res) => {
@@ -321,19 +536,28 @@ app.post('/api/staff/announcements', authenticateToken, authorizeRole(['staff'])
   // Get author name from token
   const authorName = req.user.username;
 
-  const newAnnouncement = {
-    id: announcements.length + 1,
-    title: title,
-    content: content,
-    date: date,
-    author_name: authorName
-  };
+  // Insert the new announcement into the database
+  const query = "INSERT INTO announcements (title, content, date, author_name) VALUES (?, ?, ?, ?)";
 
-  announcements.push(newAnnouncement);
+  db.run(query, [title, content, date, authorName], function(err) {
+    if (err) {
+      console.error('Database error inserting announcement:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
 
-  res.status(201).json({
-    ...newAnnouncement,
-    message: 'Announcement posted successfully'
+    // Return the newly created announcement
+    const newAnnouncement = {
+      id: this.lastID,
+      title: title,
+      content: content,
+      date: date,
+      author_name: authorName
+    };
+
+    res.status(201).json({
+      ...newAnnouncement,
+      message: 'Announcement posted successfully'
+    });
   });
 });
 
@@ -346,32 +570,178 @@ app.put('/api/staff/announcements/:id', authenticateToken, authorizeRole(['staff
     return res.status(400).json({ message: 'Missing required fields' });
   }
 
-  const announcementIndex = announcements.findIndex(a => a.id == id);
-  if (announcementIndex === -1) {
-    return res.status(404).json({ message: 'Announcement not found' });
-  }
+  // Update the announcement in the database
+  const query = "UPDATE announcements SET title = ?, content = ?, date = ? WHERE id = ?";
 
-  announcements[announcementIndex] = {
-    ...announcements[announcementIndex],
-    title: title,
-    content: content,
-    date: date
-  };
+  db.run(query, [title, content, date, id], function(err) {
+    if (err) {
+      console.error('Database error updating announcement:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
 
-  res.json({ message: 'Announcement updated successfully' });
+    if (this.changes === 0) {
+      return res.status(404).json({ message: 'Announcement not found' });
+    }
+
+    res.json({ message: 'Announcement updated successfully' });
+  });
 });
 
 app.delete('/api/staff/announcements/:id', authenticateToken, authorizeRole(['staff']), (req, res) => {
   const { id } = req.params;
 
-  const announcementIndex = announcements.findIndex(a => a.id == id);
-  if (announcementIndex === -1) {
-    return res.status(404).json({ message: 'Announcement not found' });
+  // Delete the announcement from the database
+  const query = "DELETE FROM announcements WHERE id = ?";
+
+  db.run(query, [id], function(err) {
+    if (err) {
+      console.error('Database error deleting announcement:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+
+    if (this.changes === 0) {
+      return res.status(404).json({ message: 'Announcement not found' });
+    }
+
+    res.json({ message: 'Announcement deleted successfully' });
+  });
+});
+
+// Subject management routes
+app.get('/api/subjects', authenticateToken, (req, res) => {
+  // Query the database for all subjects
+  const query = "SELECT * FROM subjects ORDER BY name ASC";
+
+  db.all(query, [], (err, rows) => {
+    if (err) {
+      console.error('Database error fetching subjects:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+
+    res.json(rows);
+  });
+});
+
+app.post('/api/subjects', authenticateToken, authorizeRole(['staff']), (req, res) => {
+  const { name } = req.body;
+
+  if (!name) {
+    return res.status(400).json({ message: 'Subject name is required' });
   }
 
-  announcements.splice(announcementIndex, 1);
+  // Check if subject already exists
+  const checkQuery = "SELECT id FROM subjects WHERE LOWER(name) = LOWER(?)";
+  db.get(checkQuery, [name], (err, row) => {
+    if (err) {
+      console.error('Database error checking subject existence:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
 
-  res.json({ message: 'Announcement deleted successfully' });
+    if (row) {
+      return res.status(409).json({ message: 'Subject already exists' });
+    }
+
+    // Insert the new subject into the database
+    const insertQuery = "INSERT INTO subjects (name) VALUES (?)";
+
+    db.run(insertQuery, [name], function(err) {
+      if (err) {
+        console.error('Database error inserting subject:', err);
+        return res.status(500).json({ message: 'Internal server error' });
+      }
+
+      // Return the newly created subject
+      const newSubject = {
+        id: this.lastID,
+        name: name
+      };
+
+      res.status(201).json({
+        ...newSubject,
+        message: 'Subject added successfully'
+      });
+    });
+  });
+});
+
+app.put('/api/subjects/:id', authenticateToken, authorizeRole(['staff']), (req, res) => {
+  const { id } = req.params;
+  const { name } = req.body;
+
+  if (!name) {
+    return res.status(400).json({ message: 'Subject name is required' });
+  }
+
+  // Check if another subject with the same name exists (excluding current subject)
+  const checkQuery = "SELECT id FROM subjects WHERE LOWER(name) = LOWER(?) AND id != ?";
+  db.get(checkQuery, [name, id], (err, row) => {
+    if (err) {
+      console.error('Database error checking subject existence:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+
+    if (row) {
+      return res.status(409).json({ message: 'Subject name already exists' });
+    }
+
+    // Update the subject in the database
+    const updateQuery = "UPDATE subjects SET name = ? WHERE id = ?";
+
+    db.run(updateQuery, [name, id], function(err) {
+      if (err) {
+        console.error('Database error updating subject:', err);
+        return res.status(500).json({ message: 'Internal server error' });
+      }
+
+      if (this.changes === 0) {
+        return res.status(404).json({ message: 'Subject not found' });
+      }
+
+      // Return the updated subject
+      const updatedSubject = {
+        id: parseInt(id),
+        name: name
+      };
+
+      res.json({
+        ...updatedSubject,
+        message: 'Subject updated successfully'
+      });
+    });
+  });
+});
+
+app.delete('/api/subjects/:id', authenticateToken, authorizeRole(['staff']), (req, res) => {
+  const { id } = req.params;
+
+  // Check if any grades are associated with this subject
+  const checkGradesQuery = "SELECT COUNT(*) as count FROM grades WHERE subject = (SELECT name FROM subjects WHERE id = ?)";
+  db.get(checkGradesQuery, [id], (err, row) => {
+    if (err) {
+      console.error('Database error checking associated grades:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+
+    if (row.count > 0) {
+      return res.status(409).json({ message: 'Cannot delete subject: grades are associated with it' });
+    }
+
+    // Delete the subject from the database
+    const deleteQuery = "DELETE FROM subjects WHERE id = ?";
+
+    db.run(deleteQuery, [id], function(err) {
+      if (err) {
+        console.error('Database error deleting subject:', err);
+        return res.status(500).json({ message: 'Internal server error' });
+      }
+
+      if (this.changes === 0) {
+        return res.status(404).json({ message: 'Subject not found' });
+      }
+
+      res.json({ message: 'Subject deleted successfully' });
+    });
+  });
 });
 
 // Error handling middleware

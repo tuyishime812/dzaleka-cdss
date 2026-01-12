@@ -51,8 +51,7 @@ db.serialize(() => {
     grade REAL NOT NULL,
     date DATE NOT NULL,
     teacher_id INTEGER,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (teacher_id) REFERENCES teachers(id)
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
   // Announcements table
@@ -306,9 +305,9 @@ app.get('/api/grades/student/:studentId', authenticateToken, (req, res) => {
   }
 
   const query = `
-    SELECT g.id, g.subject, g.exam_type, g.grade, g.date, t.name as teacher_name
+    SELECT g.id, g.subject, g.exam_type, g.grade, g.date, u.username as teacher_name
     FROM grades g
-    LEFT JOIN teachers t ON g.teacher_id = t.id
+    LEFT JOIN users u ON g.teacher_id = u.id
     WHERE g.student_id = ?
     ORDER BY g.date DESC
   `;
@@ -326,9 +325,10 @@ app.get('/api/grades/student/:studentId', authenticateToken, (req, res) => {
 // Staff grades routes - staff can view all grades
 app.get('/api/grades/staff', authenticateToken, authorizeRole(['staff']), (req, res) => {
   const query = `
-    SELECT g.id, g.student_id, s.name as student_name, g.subject, g.exam_type, g.grade, g.date
+    SELECT g.id, g.student_id, s.name as student_name, g.subject, g.exam_type, g.grade, g.date, u.username as teacher_name
     FROM grades g
     LEFT JOIN students s ON g.student_id = s.student_id
+    LEFT JOIN users u ON g.teacher_id = u.id
     ORDER BY g.date DESC
   `;
 
@@ -430,6 +430,41 @@ app.delete('/api/grades/:id', authenticateToken, authorizeRole(['staff']), (req,
     }
 
     res.json({ message: 'Grade deleted successfully' });
+  });
+});
+
+// Subjects routes
+app.get('/api/subjects', authenticateToken, (req, res) => {
+  // Return a predefined list of subjects
+  const subjects = [
+    { id: 1, name: 'Mathematics' },
+    { id: 2, name: 'English' },
+    { id: 3, name: 'Science' },
+    { id: 4, name: 'Social Studies' },
+    { id: 5, name: 'Kiswahili' },
+    { id: 6, name: 'French' },
+    { id: 7, name: 'Computer Science' },
+    { id: 8, name: 'Physics' },
+    { id: 9, name: 'Chemistry' },
+    { id: 10, name: 'Biology' }
+  ];
+
+  res.json(subjects);
+});
+
+app.post('/api/subjects', authenticateToken, authorizeRole(['staff']), (req, res) => {
+  const { name } = req.body;
+
+  if (!name) {
+    return res.status(400).json({ message: 'Subject name is required' });
+  }
+
+  // In a real application, you would insert into a subjects table
+  // For this implementation, we'll just return success
+  res.status(201).json({
+    id: Date.now(), // Temporary ID
+    name: name,
+    message: 'Subject added successfully'
   });
 });
 

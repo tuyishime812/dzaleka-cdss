@@ -72,21 +72,165 @@ async function loadStudentGrades() {
             tableBody.innerHTML = '';
             grades.forEach(grade => {
                 const row = document.createElement('tr');
+
+                // Determine grade classification
+                let gradeClass = '';
+                let gradeStatus = '';
+
+                if (grade.grade >= 85) {
+                    gradeClass = 'table-success'; // Green for excellent
+                    gradeStatus = 'Excellent';
+                } else if (grade.grade >= 70) {
+                    gradeClass = 'table-primary'; // Blue for good
+                    gradeStatus = 'Good';
+                } else if (grade.grade >= 50) {
+                    gradeClass = 'table-warning'; // Yellow for average
+                    gradeStatus = 'Average';
+                } else {
+                    gradeClass = 'table-danger'; // Red for poor
+                    gradeStatus = 'Needs Improvement';
+                }
+
                 row.innerHTML = `
-                    <td>${grade.subject}</td>
-                    <td>${grade.exam_type}</td>
-                    <td>${grade.grade}</td>
-                    <td>${new Date(grade.date).toLocaleDateString()}</td>
-                    <td>${grade.teacher_name || 'N/A'}</td>
+                    <td class="${gradeClass}">${grade.subject}</td>
+                    <td class="${gradeClass}">${grade.exam_type}</td>
+                    <td class="${gradeClass}"><strong>${grade.grade}%</strong></td>
+                    <td class="${gradeClass}">${new Date(grade.date).toLocaleDateString()}</td>
+                    <td class="${gradeClass}">${grade.teacher_name || 'N/A'}</td>
+                    <td class="${gradeClass}"><span class="badge bg-${getGradeBadgeColor(grade.grade)}">${gradeStatus}</span></td>
                 `;
                 tableBody.appendChild(row);
             });
+
+            // After loading grades, update the statistics
+            updateGradeStatistics(grades);
         } else {
             console.error('Error loading grades:', await response.text());
         }
     } catch (error) {
         console.error('Error loading grades:', error);
     }
+}
+
+// Helper function to determine badge color based on grade
+function getGradeBadgeColor(grade) {
+    if (grade >= 85) return 'success';      // Green for excellent
+    if (grade >= 70) return 'primary';      // Blue for good
+    if (grade >= 50) return 'warning';      // Yellow for average
+    return 'danger';                        // Red for needs improvement
+}
+
+// Function to calculate and display grade statistics
+function updateGradeStatistics(grades) {
+    if (!grades || grades.length === 0) {
+        document.getElementById('gradeStats').innerHTML = '<p>No grades available to calculate statistics.</p>';
+        return;
+    }
+
+    // Calculate statistics
+    let totalGrades = 0;
+    let totalScore = 0;
+    let highestGrade = 0;
+    let lowestGrade = 100;
+    const subjectGrades = {};
+
+    grades.forEach(grade => {
+        totalGrades++;
+        totalScore += grade.grade;
+
+        if (grade.grade > highestGrade) {
+            highestGrade = grade.grade;
+        }
+
+        if (grade.grade < lowestGrade) {
+            lowestGrade = grade.grade;
+        }
+
+        // Track grades by subject
+        if (!subjectGrades[grade.subject]) {
+            subjectGrades[grade.subject] = {
+                count: 0,
+                total: 0,
+                grades: []
+            };
+        }
+
+        subjectGrades[grade.subject].count++;
+        subjectGrades[grade.subject].total += grade.grade;
+        subjectGrades[grade.subject].grades.push(grade.grade);
+    });
+
+    const averageGrade = totalScore / totalGrades;
+
+    // Prepare statistics HTML
+    let statsHtml = `
+        <div class="row">
+            <div class="col-md-3">
+                <div class="card text-center bg-light">
+                    <div class="card-body">
+                        <h5 class="card-title">Average Grade</h5>
+                        <h3 class="text-primary"><strong>${averageGrade.toFixed(1)}%</strong></h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center bg-light">
+                    <div class="card-body">
+                        <h5 class="card-title">Highest Grade</h5>
+                        <h3 class="text-success"><strong>${highestGrade}%</strong></h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center bg-light">
+                    <div class="card-body">
+                        <h5 class="card-title">Lowest Grade</h5>
+                        <h3 class="text-danger"><strong>${lowestGrade}%</strong></h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center bg-light">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Subjects</h5>
+                        <h3 class="text-info"><strong>${Object.keys(subjectGrades).length}</strong></h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h4 class="mt-4">Grade Distribution by Subject</h4>
+        <div class="row">
+    `;
+
+    // Add subject-specific statistics
+    for (const subject in subjectGrades) {
+        const subjectAvg = subjectGrades[subject].total / subjectGrades[subject].count;
+        const subjectMax = Math.max(...subjectGrades[subject].grades);
+        const subjectMin = Math.min(...subjectGrades[subject].grades);
+
+        statsHtml += `
+            <div class="col-md-4">
+                <div class="card mb-3">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">${subject}</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            <strong>Average:</strong> ${subjectAvg.toFixed(1)}%<br>
+                            <strong>Highest:</strong> ${subjectMax}%<br>
+                            <strong>Lowest:</strong> ${subjectMin}%<br>
+                            <strong>Exams:</strong> ${subjectGrades[subject].count}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    statsHtml += '</div>';
+
+    document.getElementById('gradeStats').innerHTML = statsHtml;
 }
 
 // Function to load grade summary

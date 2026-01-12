@@ -64,6 +64,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Load students
     loadStudents();
 
+    // Load subjects
+    loadSubjects();
+
     // Set up search functionality
     const gradeSearch = document.getElementById('gradeSearch');
     if (gradeSearch) {
@@ -79,13 +82,7 @@ async function loadAllGrades(searchTerm = '') {
     if (!token) return;
 
     try {
-        let url = '/api/grades/staff';
-        if (searchTerm) {
-            // For search, we'll need to filter client-side since the API doesn't support search
-            url = '/api/grades/staff';
-        }
-
-        const response = await fetch(url, {
+        const response = await fetch('/api/grades/staff', {
             headers: {
                 'Authorization': `Bearer ${token}`
             }
@@ -105,11 +102,12 @@ async function loadAllGrades(searchTerm = '') {
             if (searchTerm) {
                 filteredGrades = grades.filter(grade =>
                     grade.student_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    (grade.student_name && grade.student_name.toLowerCase().includes(searchTerm.toLowerCase()))
+                    (grade.student_name && grade.student_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                    grade.subject.toLowerCase().includes(searchTerm.toLowerCase())
                 );
             }
 
-            let gradesHtml = '<div class="table-responsive"><table class="table table-striped"><thead><tr><th>Student ID</th><th>Student Name</th><th>Subject</th><th>Type</th><th>Grade</th><th>Date</th><th>Actions</th></tr></thead><tbody>';
+            let gradesHtml = '<div class="table-responsive"><table class="table table-striped"><thead><tr><th>Student ID</th><th>Student Name</th><th>Subject</th><th>Type</th><th>Grade</th><th>Date</th><th>Teacher</th><th>Actions</th></tr></thead><tbody>';
 
             filteredGrades.forEach(grade => {
                 gradesHtml += `
@@ -118,8 +116,9 @@ async function loadAllGrades(searchTerm = '') {
                         <td>${grade.student_name || 'N/A'}</td>
                         <td>${grade.subject}</td>
                         <td>${grade.exam_type}</td>
-                        <td>${grade.grade}</td>
+                        <td>${grade.grade}%</td>
                         <td>${new Date(grade.date).toLocaleDateString()}</td>
+                        <td>${grade.teacher_name || 'N/A'}</td>
                         <td>
                             <button class="btn btn-sm btn-warning me-1" onclick="editGrade(${grade.id}, '${grade.student_id}', '${grade.subject}', '${grade.exam_type}', ${grade.grade}, '${grade.date}')">Edit</button>
                             <button class="btn btn-sm btn-danger" onclick="deleteGrade(${grade.id})">Delete</button>
@@ -136,6 +135,137 @@ async function loadAllGrades(searchTerm = '') {
         }
     } catch (error) {
         console.error('Error loading grades:', error);
+    }
+}
+
+// Function to load subjects
+async function loadSubjects() {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+        const response = await fetch('/api/subjects', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (response.ok) {
+            const subjects = await response.json();
+            const subjectSelect = document.getElementById('subject');
+            const editSubjectSelect = document.getElementById('editSubject');
+
+            // Clear existing options except the first one
+            if (subjectSelect) {
+                subjectSelect.innerHTML = '<option value="">Select Subject</option>';
+                subjects.forEach(subject => {
+                    const option = document.createElement('option');
+                    option.value = subject.name;
+                    option.textContent = subject.name;
+                    subjectSelect.appendChild(option);
+                });
+            }
+
+            if (editSubjectSelect) {
+                editSubjectSelect.innerHTML = '<option value="">Select Subject</option>';
+                subjects.forEach(subject => {
+                    const option = document.createElement('option');
+                    option.value = subject.name;
+                    option.textContent = subject.name;
+                    editSubjectSelect.appendChild(option);
+                });
+            }
+        } else {
+            console.error('Error loading subjects:', await response.text());
+        }
+    } catch (error) {
+        console.error('Error loading subjects:', error);
+    }
+}
+
+// Function to add a new subject
+async function addSubject() {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const newSubjectInput = document.getElementById('newSubject');
+    if (!newSubjectInput) return;
+
+    const subjectName = newSubjectInput.value.trim();
+    if (!subjectName) {
+        alert('Please enter a subject name');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/subjects', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ name: subjectName })
+        });
+
+        if (response.ok) {
+            const newSubject = await response.json();
+            alert('Subject added successfully!');
+            newSubjectInput.value = ''; // Clear the input
+
+            // Reload subjects to include the new one
+            loadSubjects();
+        } else {
+            const error = await response.json();
+            alert('Error adding subject: ' + error.message);
+        }
+    } catch (error) {
+        console.error('Error adding subject:', error);
+        alert('Error adding subject: ' + error.message);
+    }
+}
+
+// Function to load students for the dropdown
+async function loadStudentsForDropdown() {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+        const response = await fetch('/api/students', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (response.ok) {
+            const students = await response.json();
+            const studentSelect = document.getElementById('studentId');
+            const editStudentSelect = document.getElementById('editStudentId');
+
+            // Clear existing options except the first one
+            if (studentSelect) {
+                studentSelect.innerHTML = '<option value="">Select Student</option>';
+                students.forEach(student => {
+                    const option = document.createElement('option');
+                    option.value = student.student_id;
+                    option.textContent = `${student.name} (${student.student_id})`;
+                    studentSelect.appendChild(option);
+                });
+            }
+
+            if (editStudentSelect) {
+                editStudentSelect.innerHTML = '<option value="">Select Student</option>';
+                students.forEach(student => {
+                    const option = document.createElement('option');
+                    option.value = student.student_id;
+                    option.textContent = `${student.name} (${student.student_id})`;
+                    editStudentSelect.appendChild(option);
+                });
+            }
+        } else {
+            console.error('Error loading students:', await response.text());
+        }
+    } catch (error) {
+        console.error('Error loading students:', error);
     }
 }
 
@@ -160,15 +290,22 @@ async function editGrade(gradeId, studentId, subject, examType, grade, date) {
                         <input type="hidden" id="editGradeId" value="${gradeId}">
                         <div class="mb-3">
                             <label for="editStudentId" class="form-label">Student ID</label>
-                            <input type="text" class="form-control" id="editStudentId" value="${studentId}" readonly>
+                            <select class="form-control" id="editStudentId" required>
+                                <option value="">Select Student</option>
+                                <!-- Options will be loaded dynamically -->
+                            </select>
                         </div>
                         <div class="mb-3">
                             <label for="editSubject" class="form-label">Subject</label>
-                            <input type="text" class="form-control" id="editSubject" value="${subject}" required>
+                            <select class="form-control" id="editSubject" required>
+                                <option value="">Select Subject</option>
+                                <!-- Options will be loaded dynamically -->
+                            </select>
                         </div>
                         <div class="mb-3">
                             <label for="editExamType" class="form-label">Exam Type</label>
                             <select class="form-control" id="editExamType">
+                                <option value="">Select Exam Type</option>
                                 <option value="exam" ${examType === 'exam' ? 'selected' : ''}>Exam</option>
                                 <option value="quiz" ${examType === 'quiz' ? 'selected' : ''}>Quiz</option>
                                 <option value="assignment" ${examType === 'assignment' ? 'selected' : ''}>Assignment</option>
@@ -199,10 +336,88 @@ async function editGrade(gradeId, studentId, subject, examType, grade, date) {
     const bsModal = new bootstrap.Modal(modal);
     bsModal.show();
 
+    // Load students and subjects into the dropdowns with current values selected
+    setTimeout(() => {
+        loadStudentsForEdit(studentId);
+        loadSubjectsForEdit(subject);
+    }, 100); // Small delay to ensure DOM is ready
+
     // Remove modal when hidden
     modal.addEventListener('hidden.bs.modal', function() {
         modal.remove();
     });
+}
+
+// Function to load students for the edit form with the current value selected
+async function loadStudentsForEdit(currentStudentId) {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+        const response = await fetch('/api/students', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (response.ok) {
+            const students = await response.json();
+            const studentSelect = document.getElementById('editStudentId');
+
+            if (studentSelect) {
+                studentSelect.innerHTML = '<option value="">Select Student</option>';
+                students.forEach(student => {
+                    const option = document.createElement('option');
+                    option.value = student.student_id;
+                    option.textContent = `${student.name} (${student.student_id})`;
+                    if (student.student_id === currentStudentId) {
+                        option.selected = true;
+                    }
+                    studentSelect.appendChild(option);
+                });
+            }
+        } else {
+            console.error('Error loading students for edit:', await response.text());
+        }
+    } catch (error) {
+        console.error('Error loading students for edit:', error);
+    }
+}
+
+// Function to load subjects for the edit form with the current value selected
+async function loadSubjectsForEdit(currentSubject) {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+        const response = await fetch('/api/subjects', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (response.ok) {
+            const subjects = await response.json();
+            const subjectSelect = document.getElementById('editSubject');
+
+            if (subjectSelect) {
+                subjectSelect.innerHTML = '<option value="">Select Subject</option>';
+                subjects.forEach(subject => {
+                    const option = document.createElement('option');
+                    option.value = subject.name;
+                    option.textContent = subject.name;
+                    if (subject.name === currentSubject) {
+                        option.selected = true;
+                    }
+                    subjectSelect.appendChild(option);
+                });
+            }
+        } else {
+            console.error('Error loading subjects for edit:', await response.text());
+        }
+    } catch (error) {
+        console.error('Error loading subjects for edit:', error);
+    }
 }
 
 // Function to update a grade
@@ -243,9 +458,13 @@ async function updateGrade() {
             alert('Grade updated successfully!');
 
             // Close the modal
-            const modal = document.getElementById('editGradeModal');
-            const bsModal = bootstrap.Modal.getInstance(modal);
-            bsModal.hide();
+            const modals = document.querySelectorAll('.modal');
+            modals.forEach(modal => {
+                const bsModal = bootstrap.Modal.getInstance(modal);
+                if (bsModal) {
+                    bsModal.hide();
+                }
+            });
 
             // Refresh the grades list
             loadAllGrades();
@@ -404,5 +623,238 @@ async function viewGrades(studentId) {
     } catch (error) {
         console.error('Error loading grades:', error);
         alert('Error loading grades: ' + error.message);
+    }
+}
+
+// Function to load subjects
+async function loadSubjects() {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+        const response = await fetch('/api/subjects', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (response.ok) {
+            const subjects = await response.json();
+            const subjectSelect = document.getElementById('subject');
+            const examTypeSelect = document.getElementById('examType');
+            const editSubjectSelect = document.getElementById('editSubject');
+            const editExamTypeSelect = document.getElementById('editExamType');
+
+            // Populate subject dropdowns
+            if (subjectSelect) {
+                subjectSelect.innerHTML = '<option value="">Select Subject</option>';
+                subjects.forEach(subject => {
+                    const option = document.createElement('option');
+                    option.value = subject.name;
+                    option.textContent = subject.name;
+                    subjectSelect.appendChild(option);
+                });
+            }
+
+            if (editSubjectSelect) {
+                editSubjectSelect.innerHTML = '<option value="">Select Subject</option>';
+                subjects.forEach(subject => {
+                    const option = document.createElement('option');
+                    option.value = subject.name;
+                    option.textContent = subject.name;
+                    editSubjectSelect.appendChild(option);
+                });
+            }
+
+            // Populate exam type dropdowns with default options
+            const examTypes = ['Exam', 'Quiz', 'Assignment', 'Project'];
+
+            if (examTypeSelect) {
+                examTypeSelect.innerHTML = '<option value="">Select Exam Type</option>';
+                examTypes.forEach(type => {
+                    const option = document.createElement('option');
+                    option.value = type.toLowerCase();
+                    option.textContent = type;
+                    examTypeSelect.appendChild(option);
+                });
+            }
+
+            if (editExamTypeSelect) {
+                editExamTypeSelect.innerHTML = '<option value="">Select Exam Type</option>';
+                examTypes.forEach(type => {
+                    const option = document.createElement('option');
+                    option.value = type.toLowerCase();
+                    option.textContent = type;
+                    editExamTypeSelect.appendChild(option);
+                });
+            }
+
+            // Load subjects list in the management section
+            loadSubjectsList();
+        } else {
+            console.error('Error loading subjects:', await response.text());
+        }
+    } catch (error) {
+        console.error('Error loading subjects:', error);
+    }
+}
+
+// Function to load subjects list for management
+async function loadSubjectsList() {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+        const response = await fetch('/api/subjects', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (response.ok) {
+            const subjects = await response.json();
+            const subjectsListContainer = document.getElementById('subjectsList');
+
+            if (!subjectsListContainer) {
+                console.error('Subjects list container not found');
+                return;
+            }
+
+            if (subjects.length === 0) {
+                subjectsListContainer.innerHTML = '<p class="text-muted">No subjects available.</p>';
+                return;
+            }
+
+            let subjectsHtml = '<div class="list-group">';
+            subjects.forEach(subject => {
+                subjectsHtml += `
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>${subject.name}</span>
+                        <div>
+                            <button class="btn btn-sm btn-warning me-1" onclick="editSubject(${subject.id}, '${subject.name.replace(/'/g, "\\'")}')">Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteSubject(${subject.id}, '${subject.name.replace(/'/g, "\\'")}')">Delete</button>
+                        </div>
+                    </div>
+                `;
+            });
+            subjectsHtml += '</div>';
+
+            subjectsListContainer.innerHTML = subjectsHtml;
+        } else {
+            console.error('Error loading subjects list:', await response.text());
+        }
+    } catch (error) {
+        console.error('Error loading subjects list:', error);
+    }
+}
+
+// Function to add a new subject
+async function addSubject() {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const newSubjectInput = document.getElementById('newSubject');
+    if (!newSubjectInput) return;
+
+    const subjectName = newSubjectInput.value.trim();
+    if (!subjectName) {
+        alert('Please enter a subject name');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/subjects', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ name: subjectName })
+        });
+
+        if (response.ok) {
+            const newSubject = await response.json();
+            alert('Subject added successfully!');
+            newSubjectInput.value = ''; // Clear the input
+
+            // Reload subjects to include the new one
+            loadSubjects();
+        } else {
+            const error = await response.json();
+            alert('Error adding subject: ' + error.message);
+        }
+    } catch (error) {
+        console.error('Error adding subject:', error);
+        alert('Error adding subject: ' + error.message);
+    }
+}
+
+// Function to edit a subject
+async function editSubject(subjectId, currentName) {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const newName = prompt('Enter new name for the subject:', currentName);
+    if (!newName || newName.trim() === '') {
+        alert('Subject name cannot be empty');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/subjects/${subjectId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ name: newName.trim() })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            alert('Subject updated successfully!');
+
+            // Reload subjects to reflect the change
+            loadSubjects();
+        } else {
+            const error = await response.json();
+            alert('Error updating subject: ' + error.message);
+        }
+    } catch (error) {
+        console.error('Error updating subject:', error);
+        alert('Error updating subject: ' + error.message);
+    }
+}
+
+// Function to delete a subject
+async function deleteSubject(subjectId, subjectName) {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    if (!confirm(`Are you sure you want to delete the subject "${subjectName}"? This action cannot be undone.`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/subjects/${subjectId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            alert('Subject deleted successfully!');
+
+            // Reload subjects to reflect the change
+            loadSubjects();
+        } else {
+            const error = await response.json();
+            alert('Error deleting subject: ' + error.message);
+        }
+    } catch (error) {
+        console.error('Error deleting subject:', error);
+        alert('Error deleting subject: ' + error.message);
     }
 }

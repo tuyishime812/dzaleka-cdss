@@ -19,15 +19,8 @@
                     <li class="nav-item">
                         <a class="nav-link" href="/">Home</a>
                     </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
-                            Dashboard
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="/teacher">Teacher Dashboard</a></li>
-                            <li><a class="dropdown-item" href="/student">Student Dashboard</a></li>
-                            <li><a class="dropdown-item" href="/staff">Staff Dashboard</a></li>
-                        </ul>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/student">Student Dashboard</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="/logout">Logout</a>
@@ -40,27 +33,28 @@
     <div class="container mt-5">
         <div class="row">
             <div class="col-md-12">
-                <h2>Student Dashboard</h2>
-                <p>Welcome, Student! You can view your grades and exam results here.</p>
+                <h2>Dashboard</h2>
+                <p>Welcome! You can view your grades and exam results here.</p>
             </div>
         </div>
 
         <div class="row mt-4">
             <div class="col-md-12">
                 <div class="card">
-                    <div class="card-header">
-                        <h5>Your Grades</h5>
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Your Grades</h5>
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">
-                            <table class="table table-striped" id="gradesTable">
-                                <thead>
+                            <table class="table table-striped table-hover" id="gradesTable">
+                                <thead class="table-dark">
                                     <tr>
                                         <th>Subject</th>
                                         <th>Exam Type</th>
                                         <th>Grade</th>
                                         <th>Date</th>
                                         <th>Teacher</th>
+                                        <th>Status</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -74,10 +68,25 @@
         </div>
 
         <div class="row mt-4">
-            <div class="col-md-6">
+            <div class="col-md-12">
                 <div class="card">
-                    <div class="card-header">
-                        <h5>Grade Summary</h5>
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Grade Statistics</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="gradeStats">
+                            <p>Loading statistics...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Grade Summary</h5>
                     </div>
                     <div class="card-body">
                         <div id="gradeSummary">
@@ -86,11 +95,11 @@
                     </div>
                 </div>
             </div>
-            
+
             <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header">
-                        <h5>Recent Announcements</h5>
+                <div class="card h-100">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Recent Announcements</h5>
                     </div>
                     <div class="card-body">
                         <div id="announcements">
