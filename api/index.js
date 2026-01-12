@@ -7,7 +7,8 @@ const helmet = require('helmet');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const validator = require('validator');
-const sqlite3 = require('sqlite3').verbose();
+const sqlite = require('sqlite');
+const sqlite3 = require('sqlite3');
 require('dotenv').config();
 
 // Create Express app
@@ -49,14 +50,19 @@ app.use(express.static(path.join(__dirname, '../public')));
 
 // Initialize SQLite database
 const dbPath = path.join(__dirname, '../database.db');
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    console.error('Error opening database:', err);
-  } else {
-    console.log('Connected to SQLite database');
+
+// Open database connection
+let db;
+
+async function initializeDatabase() {
+  try {
+    db = await sqlite.open({
+      filename: dbPath,
+      driver: sqlite3.Database
+    });
 
     // Create tables if they don't exist
-    db.run(`
+    await db.run(`
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE NOT NULL,
@@ -67,7 +73,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
       )
     `);
 
-    db.run(`
+    await db.run(`
       CREATE TABLE IF NOT EXISTS students (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         student_id TEXT UNIQUE NOT NULL,
@@ -78,7 +84,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
       )
     `);
 
-    db.run(`
+    await db.run(`
       CREATE TABLE IF NOT EXISTS subjects (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT UNIQUE NOT NULL,
@@ -86,7 +92,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
       )
     `);
 
-    db.run(`
+    await db.run(`
       CREATE TABLE IF NOT EXISTS grades (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         student_id TEXT NOT NULL,
@@ -100,7 +106,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
       )
     `);
 
-    db.run(`
+    await db.run(`
       CREATE TABLE IF NOT EXISTS announcements (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
@@ -112,21 +118,25 @@ const db = new sqlite3.Database(dbPath, (err) => {
     `);
 
     // Initialize default users if they don't exist
-    initializeDefaultUsers();
+    await initializeDefaultUsers();
 
     // Initialize default subjects if they don't exist
-    initializeDefaultSubjects();
+    await initializeDefaultSubjects();
+
+    console.log('Connected to SQLite database and initialized tables');
+  } catch (err) {
+    console.error('Error initializing database:', err);
   }
-});
+}
+
+// Initialize the database
+initializeDatabase();
 
 // Initialize default users
 const initializeDefaultUsers = async () => {
   // Check if default users already exist
-  db.get("SELECT COUNT(*) as count FROM users", [], (err, row) => {
-    if (err) {
-      console.error('Error checking users:', err);
-      return;
-    }
+  try {
+    const row = await db.get("SELECT COUNT(*) as count FROM users");
 
     if (row.count === 0) {
       // Hash passwords and insert default users
@@ -144,14 +154,15 @@ const initializeDefaultUsers = async () => {
         { username: 'tuyishime_student', email: 'tuyishime_student@student.edu', password_hash: studentHash, role: 'student' }
       ];
 
-      const stmt = db.prepare("INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)");
-      defaultUsers.forEach(user => {
-        stmt.run([user.username, user.email, user.password_hash, user.role]);
-      });
-      stmt.finalize();
+      for (const user of defaultUsers) {
+        await db.run("INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)",
+          user.username, user.email, user.password_hash, user.role);
+      }
       console.log('Default users inserted');
     }
-  });
+  } catch (err) {
+    console.error('Error checking/inserting default users:', err);
+  }
 };
 
 // Simple in-memory token blacklist for session management
@@ -182,27 +193,24 @@ setInterval(() => {
 }, 60 * 60 * 1000); // Run every hour
 
 // Initialize default subjects
-const initializeDefaultSubjects = () => {
+const initializeDefaultSubjects = async () => {
   // Check if default subjects already exist
-  db.get("SELECT COUNT(*) as count FROM subjects", [], (err, row) => {
-    if (err) {
-      console.error('Error checking subjects:', err);
-      return;
-    }
+  try {
+    const row = await db.get("SELECT COUNT(*) as count FROM subjects");
 
     if (row.count === 0) {
       const defaultSubjects = [
         'Mathematics', 'English', 'Science', 'History', 'Geography'
       ];
 
-      const stmt = db.prepare("INSERT INTO subjects (name) VALUES (?)");
-      defaultSubjects.forEach(subject => {
-        stmt.run([subject]);
-      });
-      stmt.finalize();
+      for (const subject of defaultSubjects) {
+        await db.run("INSERT INTO subjects (name) VALUES (?)", subject);
+      }
       console.log('Default subjects inserted');
     }
-  });
+  } catch (err) {
+    console.error('Error checking/inserting default subjects:', err);
+  }
 };
 
 // Authentication middleware
@@ -233,15 +241,21 @@ const authenticateToken = (req, res, next) => {
       return res.status(403).json({ message: 'Invalid or expired token' });
     }
 
-    // Additional security check: ensure user exists in database
-    db.get("SELECT id, username, role FROM users WHERE id = ?", [user.id], (err, dbUser) => {
-      if (err || !dbUser) {
+    try {
+      // Additional security check: ensure user exists in database
+      const userStmt = db.prepare("SELECT id, username, role FROM users WHERE id = ?");
+      const dbUser = userStmt.get(user.id);
+
+      if (!dbUser) {
         return res.status(403).json({ message: 'User no longer exists' });
       }
 
       req.user = user;
       next();
-    });
+    } catch (err) {
+      console.error('Database error during authentication:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
   });
 };
 
@@ -299,12 +313,10 @@ app.post('/api/users/login', loginLimiter, async (req, res) => {
   // Sanitize inputs
   const sanitizedUsername = validator.escape(username.trim());
 
-  // Query the database for the user
-  db.get("SELECT * FROM users WHERE username = ?", [sanitizedUsername], async (err, user) => {
-    if (err) {
-      console.error('Database error during login:', err);
-      return res.status(500).json({ message: 'Internal server error' });
-    }
+  try {
+    // Query the database for the user
+    const userStmt = db.prepare("SELECT * FROM users WHERE username = ?");
+    const user = userStmt.get(sanitizedUsername);
 
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
@@ -345,7 +357,10 @@ app.post('/api/users/login', loginLimiter, async (req, res) => {
       console.error('Error during password comparison:', error);
       res.status(500).json({ message: 'Authentication error' });
     }
-  });
+  } catch (err) {
+    console.error('Database error during login:', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
 });
 
 // Student grades routes
@@ -368,44 +383,46 @@ app.get('/api/grades/student/:studentId', authenticateToken, (req, res) => {
     }
   }
 
-  // Query the database for grades for the specific student
-  const query = `
-    SELECT g.*, u.username as teacher_name
-    FROM grades g
-    LEFT JOIN users u ON g.teacher_id = u.id
-    WHERE g.student_id = ?
-    ORDER BY g.created_at DESC
-  `;
+  try {
+    // Query the database for grades for the specific student
+    const query = `
+      SELECT g.*, u.username as teacher_name
+      FROM grades g
+      LEFT JOIN users u ON g.teacher_id = u.id
+      WHERE g.student_id = ?
+      ORDER BY g.created_at DESC
+    `;
 
-  db.all(query, [sanitizedStudentId], (err, rows) => {
-    if (err) {
-      console.error('Database error fetching student grades:', err);
-      return res.status(500).json({ message: 'Internal server error' });
-    }
+    const stmt = db.prepare(query);
+    const rows = stmt.all(sanitizedStudentId);
 
     res.json(rows);
-  });
+  } catch (err) {
+    console.error('Database error fetching student grades:', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
 });
 
 // Staff grades routes - staff can view all grades
 app.get('/api/grades/staff', authenticateToken, authorizeRole(['staff']), (req, res) => {
-  // Query the database for all grades with student information
-  const query = `
-    SELECT g.*, s.name as student_name, u.username as teacher_name
-    FROM grades g
-    LEFT JOIN students s ON g.student_id = s.student_id
-    LEFT JOIN users u ON g.teacher_id = u.id
-    ORDER BY g.created_at DESC
-  `;
+  try {
+    // Query the database for all grades with student information
+    const query = `
+      SELECT g.*, s.name as student_name, u.username as teacher_name
+      FROM grades g
+      LEFT JOIN students s ON g.student_id = s.student_id
+      LEFT JOIN users u ON g.teacher_id = u.id
+      ORDER BY g.created_at DESC
+    `;
 
-  db.all(query, [], (err, rows) => {
-    if (err) {
-      console.error('Database error fetching all grades:', err);
-      return res.status(500).json({ message: 'Internal server error' });
-    }
+    const stmt = db.prepare(query);
+    const rows = stmt.all();
 
     res.json(rows);
-  });
+  } catch (err) {
+    console.error('Database error fetching all grades:', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
 });
 
 app.post('/api/grades', authenticateToken, authorizeRole(['staff']), (req, res) => {
@@ -432,61 +449,54 @@ app.post('/api/grades', authenticateToken, authorizeRole(['staff']), (req, res) 
     return res.status(400).json({ message: 'Invalid date format' });
   }
 
-  // Check if student exists
-  db.get("SELECT id FROM students WHERE student_id = ?", [sanitizedStudentId], (err, student) => {
-    if (err) {
-      console.error('Database error checking student:', err);
-      return res.status(500).json({ message: 'Internal server error' });
-    }
+  try {
+    // Check if student exists
+    const studentStmt = db.prepare("SELECT id FROM students WHERE student_id = ?");
+    const student = studentStmt.get(sanitizedStudentId);
 
     if (!student) {
       return res.status(404).json({ message: 'Student not found' });
     }
 
     // Check if subject exists
-    db.get("SELECT id FROM subjects WHERE name = ?", [sanitizedSubject], (err, subjectRecord) => {
-      if (err) {
-        console.error('Database error checking subject:', err);
-        return res.status(500).json({ message: 'Internal server error' });
-      }
+    const subjectStmt = db.prepare("SELECT id FROM subjects WHERE name = ?");
+    const subjectRecord = subjectStmt.get(sanitizedSubject);
 
-      if (!subjectRecord) {
-        return res.status(404).json({ message: 'Subject not found' });
-      }
+    if (!subjectRecord) {
+      return res.status(404).json({ message: 'Subject not found' });
+    }
 
-      // Staff member who is adding the grade
-      const staffId = req.user.id;
+    // Staff member who is adding the grade
+    const staffId = req.user.id;
 
-      // Insert the new grade into the database
-      const query = `
-        INSERT INTO grades (student_id, subject, exam_type, grade, date, teacher_id)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `;
+    // Insert the new grade into the database
+    const insertQuery = `
+      INSERT INTO grades (student_id, subject, exam_type, grade, date, teacher_id)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `;
 
-      db.run(query, [sanitizedStudentId, sanitizedSubject, sanitizedExamType, validatedGrade, date, staffId], function(err) {
-        if (err) {
-          console.error('Database error inserting grade:', err);
-          return res.status(500).json({ message: 'Internal server error' });
-        }
+    const insertStmt = db.prepare(insertQuery);
+    const result = insertStmt.run(sanitizedStudentId, sanitizedSubject, sanitizedExamType, validatedGrade, date, staffId);
 
-        // Return the newly created grade
-        const newGrade = {
-          id: this.lastID,
-          student_id: sanitizedStudentId,
-          subject: sanitizedSubject,
-          exam_type: sanitizedExamType,
-          grade: validatedGrade,
-          date: date,
-          teacher_id: staffId
-        };
+    // Return the newly created grade
+    const newGrade = {
+      id: result.lastInsertRowid,
+      student_id: sanitizedStudentId,
+      subject: sanitizedSubject,
+      exam_type: sanitizedExamType,
+      grade: validatedGrade,
+      date: date,
+      teacher_id: staffId
+    };
 
-        res.status(201).json({
-          ...newGrade,
-          message: 'Grade added successfully'
-        });
-      });
+    res.status(201).json({
+      ...newGrade,
+      message: 'Grade added successfully'
     });
-  });
+  } catch (err) {
+    console.error('Database error in POST grades:', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
 });
 
 // PUT route to update a grade
