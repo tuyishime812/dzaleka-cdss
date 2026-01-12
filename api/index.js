@@ -14,6 +14,9 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Serve static files from the public directory
+app.use(express.static(path.join(__dirname, '../public')));
+
 // In-memory storage for demo purposes (in production, use a real database)
 let users = [
   { id: 1, username: 'emmanuel', email: 'emmanuel@staff.edu', password_hash: '', role: 'staff' },
@@ -79,9 +82,21 @@ const authorizeRole = (roles) => {
   };
 };
 
-// Main routes
+// Main routes - serve HTML files
 app.get('/', (req, res) => {
-  res.json({ message: 'School Portal API is running!' });
+  res.sendFile(path.join(__dirname, '../public/index.html'));
+});
+
+app.get('/login', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/login.html'));
+});
+
+app.get('/student', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/student.html'));
+});
+
+app.get('/staff', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/staff.html'));
 });
 
 // Authentication routes
@@ -365,9 +380,9 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Something went wrong!' });
 });
 
-// 404 handler
+// 404 handler - serve index.html for any other routes to enable client-side routing
 app.use((req, res) => {
-  res.status(404).json({ message: 'Route not found' });
+  res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
 // Export for Vercel
