@@ -2,13 +2,42 @@
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const validator = require('validator');
 const sqlite3 = require('sqlite3').verbose();
 require('dotenv').config();
 
 // Create Express app
 const app = express();
+
+// Security middleware
+app.use(helmet()); // Sets security headers
+
+// Rate limiting for API endpoints
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: {
+    error: 'Too many requests from this IP, please try again later.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/', apiLimiter);
+
+// Rate limiting for login attempts
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 login requests per windowMs
+  message: {
+    error: 'Too many login attempts from this IP, please try again later.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Middleware
 app.use(cors());
@@ -123,6 +152,33 @@ const initializeDefaultUsers = async () => {
   });
 };
 
+// Simple in-memory token blacklist for session management
+const tokenBlacklist = new Set();
+
+// Periodically clean up expired tokens from the blacklist (every hour)
+setInterval(() => {
+  const now = Math.floor(Date.now() / 1000); // Current time in seconds
+  const tokensToRemove = [];
+
+  for (const token of tokenBlacklist) {
+    try {
+      const decoded = jwt.decode(token);
+      if (decoded && decoded.exp && decoded.exp < now) {
+        tokensToRemove.push(token);
+      }
+    } catch (err) {
+      // If token is malformed, remove it
+      tokensToRemove.push(token);
+    }
+  }
+
+  tokensToRemove.forEach(token => tokenBlacklist.delete(token));
+
+  if (tokensToRemove.length > 0) {
+    console.log(`Cleaned up ${tokensToRemove.length} expired tokens from blacklist`);
+  }
+}, 60 * 60 * 1000); // Run every hour
+
 // Initialize default subjects
 const initializeDefaultSubjects = () => {
   // Check if default subjects already exist
@@ -156,12 +212,34 @@ const authenticateToken = (req, res, next) => {
     return res.status(401).json({ message: 'Access token required' });
   }
 
-  jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret_key', (err, user) => {
+  // Check if token is in blacklist
+  if (tokenBlacklist.has(token)) {
+    return res.status(403).json({ message: 'Token has been invalidated. Please log in again.' });
+  }
+
+  // Verify the token with additional security options
+  jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret_key', {
+    algorithms: ['HS256'],
+    ignoreExpiration: false
+  }, (err, user) => {
     if (err) {
+      if (err.name === 'TokenExpiredError') {
+        return res.status(403).json({ message: 'Token has expired. Please log in again.' });
+      } else if (err.name === 'JsonWebTokenError') {
+        return res.status(403).json({ message: 'Invalid token. Please log in again.' });
+      }
       return res.status(403).json({ message: 'Invalid or expired token' });
     }
-    req.user = user;
-    next();
+
+    // Additional security check: ensure user exists in database
+    db.get("SELECT id, username, role FROM users WHERE id = ?", [user.id], (err, dbUser) => {
+      if (err || !dbUser) {
+        return res.status(403).json({ message: 'User no longer exists' });
+      }
+
+      req.user = user;
+      next();
+    });
   });
 };
 
@@ -197,15 +275,18 @@ app.get('/staff', (req, res) => {
 });
 
 // Authentication routes
-app.post('/api/users/login', async (req, res) => {
+app.post('/api/users/login', loginLimiter, async (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
     return res.status(400).json({ message: 'Username and password are required' });
   }
 
+  // Sanitize inputs
+  const sanitizedUsername = validator.escape(username.trim());
+
   // Query the database for the user
-  db.get("SELECT * FROM users WHERE username = ?", [username], async (err, user) => {
+  db.get("SELECT * FROM users WHERE username = ?", [sanitizedUsername], async (err, user) => {
     if (err) {
       console.error('Database error during login:', err);
       return res.status(500).json({ message: 'Internal server error' });
@@ -221,11 +302,20 @@ app.post('/api/users/login', async (req, res) => {
         return res.status(401).json({ message: 'Invalid credentials' });
       }
 
-      // Generate JWT token
+      // Generate JWT token with additional security claims
       const token = jwt.sign(
-        { id: user.id, username: user.username, role: user.role },
+        {
+          id: user.id,
+          username: user.username,
+          role: user.role,
+          iat: Math.floor(Date.now() / 1000), // issued at time
+          exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60) // expires in 24 hours
+        },
         process.env.JWT_SECRET || 'fallback_secret_key',
-        { expiresIn: '24h' }
+        {
+          expiresIn: '24h',
+          algorithm: 'HS256'
+        }
       );
 
       res.json({
@@ -248,10 +338,18 @@ app.post('/api/users/login', async (req, res) => {
 app.get('/api/grades/student/:studentId', authenticateToken, (req, res) => {
   const { studentId } = req.params;
 
+  // Validate studentId parameter
+  if (!studentId || typeof studentId !== 'string' || studentId.trim().length === 0) {
+    return res.status(400).json({ message: 'Invalid student ID' });
+  }
+
+  // Sanitize studentId
+  const sanitizedStudentId = validator.escape(studentId.trim());
+
   // Check if the requesting user is a student and only allow them to access their own grades
   if (req.user.role === 'student') {
     // For students, only allow them to access grades with their own username as student_id
-    if (req.user.username !== studentId) {
+    if (req.user.username !== sanitizedStudentId) {
       return res.status(403).json({ message: 'Students can only access their own grades' });
     }
   }
@@ -265,7 +363,7 @@ app.get('/api/grades/student/:studentId', authenticateToken, (req, res) => {
     ORDER BY g.created_at DESC
   `;
 
-  db.all(query, [studentId], (err, rows) => {
+  db.all(query, [sanitizedStudentId], (err, rows) => {
     if (err) {
       console.error('Database error fetching student grades:', err);
       return res.status(500).json({ message: 'Internal server error' });
@@ -299,39 +397,80 @@ app.get('/api/grades/staff', authenticateToken, authorizeRole(['staff']), (req, 
 app.post('/api/grades', authenticateToken, authorizeRole(['staff']), (req, res) => {
   const { studentId, subject, examType, grade, date } = req.body;
 
+  // Validate required fields
   if (!studentId || !subject || !examType || grade === undefined || !date) {
     return res.status(400).json({ message: 'Missing required fields' });
   }
 
-  // Staff member who is adding the grade
-  const staffId = req.user.id;
+  // Validate and sanitize inputs
+  const sanitizedStudentId = validator.escape(studentId.toString().trim());
+  const sanitizedSubject = validator.escape(subject.toString().trim());
+  const sanitizedExamType = validator.escape(examType.toString().trim());
+  const validatedGrade = parseFloat(grade);
+  const validatedDate = new Date(date);
 
-  // Insert the new grade into the database
-  const query = `
-    INSERT INTO grades (student_id, subject, exam_type, grade, date, teacher_id)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `;
+  // Additional validation
+  if (isNaN(validatedGrade) || validatedGrade < 0 || validatedGrade > 100) {
+    return res.status(400).json({ message: 'Grade must be a number between 0 and 100' });
+  }
 
-  db.run(query, [studentId, subject, examType, grade, date, staffId], function(err) {
+  if (isNaN(validatedDate.getTime())) {
+    return res.status(400).json({ message: 'Invalid date format' });
+  }
+
+  // Check if student exists
+  db.get("SELECT id FROM students WHERE student_id = ?", [sanitizedStudentId], (err, student) => {
     if (err) {
-      console.error('Database error inserting grade:', err);
+      console.error('Database error checking student:', err);
       return res.status(500).json({ message: 'Internal server error' });
     }
 
-    // Return the newly created grade
-    const newGrade = {
-      id: this.lastID,
-      student_id: studentId,
-      subject: subject,
-      exam_type: examType,
-      grade: grade,
-      date: date,
-      teacher_id: staffId
-    };
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
 
-    res.status(201).json({
-      ...newGrade,
-      message: 'Grade added successfully'
+    // Check if subject exists
+    db.get("SELECT id FROM subjects WHERE name = ?", [sanitizedSubject], (err, subjectRecord) => {
+      if (err) {
+        console.error('Database error checking subject:', err);
+        return res.status(500).json({ message: 'Internal server error' });
+      }
+
+      if (!subjectRecord) {
+        return res.status(404).json({ message: 'Subject not found' });
+      }
+
+      // Staff member who is adding the grade
+      const staffId = req.user.id;
+
+      // Insert the new grade into the database
+      const query = `
+        INSERT INTO grades (student_id, subject, exam_type, grade, date, teacher_id)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `;
+
+      db.run(query, [sanitizedStudentId, sanitizedSubject, sanitizedExamType, validatedGrade, date, staffId], function(err) {
+        if (err) {
+          console.error('Database error inserting grade:', err);
+          return res.status(500).json({ message: 'Internal server error' });
+        }
+
+        // Return the newly created grade
+        const newGrade = {
+          id: this.lastID,
+          student_id: sanitizedStudentId,
+          subject: sanitizedSubject,
+          exam_type: sanitizedExamType,
+          grade: validatedGrade,
+          date: date,
+          teacher_id: staffId
+        };
+
+        res.status(201).json({
+          ...newGrade,
+          message: 'Grade added successfully'
+        });
+      });
     });
   });
 });
@@ -341,40 +480,86 @@ app.put('/api/grades/:id', authenticateToken, authorizeRole(['staff']), (req, re
   const { id } = req.params;
   const { studentId, subject, examType, grade, date } = req.body;
 
+  // Validate required fields
   if (!studentId || !subject || !examType || grade === undefined || !date) {
     return res.status(400).json({ message: 'Missing required fields' });
   }
 
-  // Update the grade in the database
-  const query = `
-    UPDATE grades
-    SET student_id = ?, subject = ?, exam_type = ?, grade = ?, date = ?
-    WHERE id = ?
-  `;
+  // Validate and sanitize inputs
+  const sanitizedId = parseInt(id);
+  const sanitizedStudentId = validator.escape(studentId.toString().trim());
+  const sanitizedSubject = validator.escape(subject.toString().trim());
+  const sanitizedExamType = validator.escape(examType.toString().trim());
+  const validatedGrade = parseFloat(grade);
+  const validatedDate = new Date(date);
 
-  db.run(query, [studentId, subject, examType, grade, date, id], function(err) {
+  // Additional validation
+  if (isNaN(sanitizedId) || sanitizedId <= 0) {
+    return res.status(400).json({ message: 'Invalid grade ID' });
+  }
+
+  if (isNaN(validatedGrade) || validatedGrade < 0 || validatedGrade > 100) {
+    return res.status(400).json({ message: 'Grade must be a number between 0 and 100' });
+  }
+
+  if (isNaN(validatedDate.getTime())) {
+    return res.status(400).json({ message: 'Invalid date format' });
+  }
+
+  // Check if student exists
+  db.get("SELECT id FROM students WHERE student_id = ?", [sanitizedStudentId], (err, student) => {
     if (err) {
-      console.error('Database error updating grade:', err);
+      console.error('Database error checking student:', err);
       return res.status(500).json({ message: 'Internal server error' });
     }
 
-    if (this.changes === 0) {
-      return res.status(404).json({ message: 'Grade not found' });
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
     }
 
-    // Return the updated grade
-    const updatedGrade = {
-      id: parseInt(id),
-      student_id: studentId,
-      subject: subject,
-      exam_type: examType,
-      grade: grade,
-      date: date
-    };
+    // Check if subject exists
+    db.get("SELECT id FROM subjects WHERE name = ?", [sanitizedSubject], (err, subjectRecord) => {
+      if (err) {
+        console.error('Database error checking subject:', err);
+        return res.status(500).json({ message: 'Internal server error' });
+      }
 
-    res.json({
-      ...updatedGrade,
-      message: 'Grade updated successfully'
+      if (!subjectRecord) {
+        return res.status(404).json({ message: 'Subject not found' });
+      }
+
+      // Update the grade in the database
+      const query = `
+        UPDATE grades
+        SET student_id = ?, subject = ?, exam_type = ?, grade = ?, date = ?
+        WHERE id = ?
+      `;
+
+      db.run(query, [sanitizedStudentId, sanitizedSubject, sanitizedExamType, validatedGrade, date, sanitizedId], function(err) {
+        if (err) {
+          console.error('Database error updating grade:', err);
+          return res.status(500).json({ message: 'Internal server error' });
+        }
+
+        if (this.changes === 0) {
+          return res.status(404).json({ message: 'Grade not found' });
+        }
+
+        // Return the updated grade
+        const updatedGrade = {
+          id: sanitizedId,
+          student_id: sanitizedStudentId,
+          subject: sanitizedSubject,
+          exam_type: sanitizedExamType,
+          grade: validatedGrade,
+          date: date
+        };
+
+        res.json({
+          ...updatedGrade,
+          message: 'Grade updated successfully'
+        });
+      });
     });
   });
 });
@@ -422,27 +607,62 @@ app.post('/api/students', authenticateToken, authorizeRole(['staff']), (req, res
     return res.status(400).json({ message: 'Missing required fields' });
   }
 
-  // Insert the new student into the database
-  const query = "INSERT INTO students (student_id, name, email, class) VALUES (?, ?, ?, ?)";
+  // Validate and sanitize inputs
+  const sanitizedStudentId = validator.escape(studentId.toString().trim());
+  const sanitizedName = validator.escape(name.toString().trim());
+  const sanitizedEmail = validator.escape(email.toString().trim());
+  const sanitizedClass = validator.escape(studentClass.toString().trim());
 
-  db.run(query, [studentId, name, email, studentClass], function(err) {
+  // Additional validation
+  if (!validator.isEmail(sanitizedEmail)) {
+    return res.status(400).json({ message: 'Invalid email format' });
+  }
+
+  if (sanitizedName.length < 2 || sanitizedName.length > 100) {
+    return res.status(400).json({ message: 'Name must be between 2 and 100 characters' });
+  }
+
+  if (sanitizedStudentId.length < 2 || sanitizedStudentId.length > 50) {
+    return res.status(400).json({ message: 'Student ID must be between 2 and 50 characters' });
+  }
+
+  if (sanitizedClass.length < 1 || sanitizedClass.length > 50) {
+    return res.status(400).json({ message: 'Class must be between 1 and 50 characters' });
+  }
+
+  // Check if student already exists
+  db.get("SELECT id FROM students WHERE student_id = ? OR email = ?", [sanitizedStudentId, sanitizedEmail], (err, existingStudent) => {
     if (err) {
-      console.error('Database error inserting student:', err);
+      console.error('Database error checking existing student:', err);
       return res.status(500).json({ message: 'Internal server error' });
     }
 
-    // Return the newly created student
-    const newStudent = {
-      id: this.lastID,
-      student_id: studentId,
-      name: name,
-      email: email,
-      class: studentClass
-    };
+    if (existingStudent) {
+      return res.status(409).json({ message: 'Student with this ID or email already exists' });
+    }
 
-    res.status(201).json({
-      ...newStudent,
-      message: 'Student added successfully'
+    // Insert the new student into the database
+    const query = "INSERT INTO students (student_id, name, email, class) VALUES (?, ?, ?, ?)";
+
+    db.run(query, [sanitizedStudentId, sanitizedName, sanitizedEmail, sanitizedClass], function(err) {
+      if (err) {
+        console.error('Database error inserting student:', err);
+        return res.status(500).json({ message: 'Internal server error' });
+      }
+
+      // Return the newly created student
+      const newStudent = {
+        id: this.lastID,
+        student_id: sanitizedStudentId,
+        name: sanitizedName,
+        email: sanitizedEmail,
+        class: sanitizedClass
+      };
+
+      res.status(201).json({
+        ...newStudent,
+        message: 'Student added successfully'
+      });
     });
   });
 });
@@ -533,13 +753,31 @@ app.post('/api/staff/announcements', authenticateToken, authorizeRole(['staff'])
     return res.status(400).json({ message: 'Missing required fields' });
   }
 
+  // Validate and sanitize inputs
+  const sanitizedTitle = validator.escape(title.toString().trim());
+  const sanitizedContent = validator.escape(content.toString().trim());
+  const validatedDate = new Date(date);
+
+  // Additional validation
+  if (sanitizedTitle.length < 2 || sanitizedTitle.length > 200) {
+    return res.status(400).json({ message: 'Title must be between 2 and 200 characters' });
+  }
+
+  if (sanitizedContent.length < 5 || sanitizedContent.length > 2000) {
+    return res.status(400).json({ message: 'Content must be between 5 and 2000 characters' });
+  }
+
+  if (isNaN(validatedDate.getTime())) {
+    return res.status(400).json({ message: 'Invalid date format' });
+  }
+
   // Get author name from token
   const authorName = req.user.username;
 
   // Insert the new announcement into the database
   const query = "INSERT INTO announcements (title, content, date, author_name) VALUES (?, ?, ?, ?)";
 
-  db.run(query, [title, content, date, authorName], function(err) {
+  db.run(query, [sanitizedTitle, sanitizedContent, date, authorName], function(err) {
     if (err) {
       console.error('Database error inserting announcement:', err);
       return res.status(500).json({ message: 'Internal server error' });
@@ -548,8 +786,8 @@ app.post('/api/staff/announcements', authenticateToken, authorizeRole(['staff'])
     // Return the newly created announcement
     const newAnnouncement = {
       id: this.lastID,
-      title: title,
-      content: content,
+      title: sanitizedTitle,
+      content: sanitizedContent,
       date: date,
       author_name: authorName
     };
@@ -570,10 +808,33 @@ app.put('/api/staff/announcements/:id', authenticateToken, authorizeRole(['staff
     return res.status(400).json({ message: 'Missing required fields' });
   }
 
+  // Validate inputs
+  const sanitizedId = parseInt(id);
+  const sanitizedTitle = validator.escape(title.toString().trim());
+  const sanitizedContent = validator.escape(content.toString().trim());
+  const validatedDate = new Date(date);
+
+  // Additional validation
+  if (isNaN(sanitizedId) || sanitizedId <= 0) {
+    return res.status(400).json({ message: 'Invalid announcement ID' });
+  }
+
+  if (sanitizedTitle.length < 2 || sanitizedTitle.length > 200) {
+    return res.status(400).json({ message: 'Title must be between 2 and 200 characters' });
+  }
+
+  if (sanitizedContent.length < 5 || sanitizedContent.length > 2000) {
+    return res.status(400).json({ message: 'Content must be between 5 and 2000 characters' });
+  }
+
+  if (isNaN(validatedDate.getTime())) {
+    return res.status(400).json({ message: 'Invalid date format' });
+  }
+
   // Update the announcement in the database
   const query = "UPDATE announcements SET title = ?, content = ?, date = ? WHERE id = ?";
 
-  db.run(query, [title, content, date, id], function(err) {
+  db.run(query, [sanitizedTitle, sanitizedContent, date, sanitizedId], function(err) {
     if (err) {
       console.error('Database error updating announcement:', err);
       return res.status(500).json({ message: 'Internal server error' });
@@ -629,9 +890,17 @@ app.post('/api/subjects', authenticateToken, authorizeRole(['staff']), (req, res
     return res.status(400).json({ message: 'Subject name is required' });
   }
 
+  // Validate and sanitize input
+  const sanitizedName = validator.escape(name.toString().trim());
+
+  // Additional validation
+  if (sanitizedName.length < 2 || sanitizedName.length > 100) {
+    return res.status(400).json({ message: 'Subject name must be between 2 and 100 characters' });
+  }
+
   // Check if subject already exists
   const checkQuery = "SELECT id FROM subjects WHERE LOWER(name) = LOWER(?)";
-  db.get(checkQuery, [name], (err, row) => {
+  db.get(checkQuery, [sanitizedName], (err, row) => {
     if (err) {
       console.error('Database error checking subject existence:', err);
       return res.status(500).json({ message: 'Internal server error' });
@@ -644,7 +913,7 @@ app.post('/api/subjects', authenticateToken, authorizeRole(['staff']), (req, res
     // Insert the new subject into the database
     const insertQuery = "INSERT INTO subjects (name) VALUES (?)";
 
-    db.run(insertQuery, [name], function(err) {
+    db.run(insertQuery, [sanitizedName], function(err) {
       if (err) {
         console.error('Database error inserting subject:', err);
         return res.status(500).json({ message: 'Internal server error' });
@@ -653,7 +922,7 @@ app.post('/api/subjects', authenticateToken, authorizeRole(['staff']), (req, res
       // Return the newly created subject
       const newSubject = {
         id: this.lastID,
-        name: name
+        name: sanitizedName
       };
 
       res.status(201).json({
@@ -672,9 +941,22 @@ app.put('/api/subjects/:id', authenticateToken, authorizeRole(['staff']), (req, 
     return res.status(400).json({ message: 'Subject name is required' });
   }
 
+  // Validate inputs
+  const sanitizedId = parseInt(id);
+  const sanitizedName = validator.escape(name.toString().trim());
+
+  // Additional validation
+  if (isNaN(sanitizedId) || sanitizedId <= 0) {
+    return res.status(400).json({ message: 'Invalid subject ID' });
+  }
+
+  if (sanitizedName.length < 2 || sanitizedName.length > 100) {
+    return res.status(400).json({ message: 'Subject name must be between 2 and 100 characters' });
+  }
+
   // Check if another subject with the same name exists (excluding current subject)
   const checkQuery = "SELECT id FROM subjects WHERE LOWER(name) = LOWER(?) AND id != ?";
-  db.get(checkQuery, [name, id], (err, row) => {
+  db.get(checkQuery, [sanitizedName, sanitizedId], (err, row) => {
     if (err) {
       console.error('Database error checking subject existence:', err);
       return res.status(500).json({ message: 'Internal server error' });
@@ -687,7 +969,7 @@ app.put('/api/subjects/:id', authenticateToken, authorizeRole(['staff']), (req, 
     // Update the subject in the database
     const updateQuery = "UPDATE subjects SET name = ? WHERE id = ?";
 
-    db.run(updateQuery, [name, id], function(err) {
+    db.run(updateQuery, [sanitizedName, sanitizedId], function(err) {
       if (err) {
         console.error('Database error updating subject:', err);
         return res.status(500).json({ message: 'Internal server error' });
@@ -699,8 +981,8 @@ app.put('/api/subjects/:id', authenticateToken, authorizeRole(['staff']), (req, 
 
       // Return the updated subject
       const updatedSubject = {
-        id: parseInt(id),
-        name: name
+        id: sanitizedId,
+        name: sanitizedName
       };
 
       res.json({
@@ -740,6 +1022,83 @@ app.delete('/api/subjects/:id', authenticateToken, authorizeRole(['staff']), (re
       }
 
       res.json({ message: 'Subject deleted successfully' });
+    });
+  });
+});
+
+// CSRF Protection - Generate CSRF Token
+app.get('/api/csrf-token', authenticateToken, (req, res) => {
+  // In a real implementation, you would generate a unique token
+  // For this implementation, we'll rely on JWT and CORS policies
+  // The JWT token itself provides protection against CSRF
+  res.json({
+    csrfToken: 'csrf_protection_enabled_via_jwt'
+  });
+});
+
+// Logout route - add token to blacklist
+app.post('/api/users/logout', authenticateToken, (req, res) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+  if (token) {
+    // Add token to blacklist (until expiration)
+    tokenBlacklist.add(token);
+  }
+
+  res.json({ message: 'Logged out successfully' });
+});
+
+// Password change route
+app.put('/api/users/change-password', authenticateToken, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ message: 'Current password and new password are required' });
+  }
+
+  // Validate new password strength
+  if (newPassword.length < 8) {
+    return res.status(400).json({ message: 'New password must be at least 8 characters long' });
+  }
+
+  if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(newPassword)) {
+    return res.status(400).json({ message: 'New password must contain at least one uppercase letter, one lowercase letter, and one number' });
+  }
+
+  // Get current user from database
+  db.get("SELECT * FROM users WHERE id = ?", [req.user.id], async (err, user) => {
+    if (err) {
+      console.error('Database error fetching user:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Verify current password
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!isCurrentPasswordValid) {
+      return res.status(401).json({ message: 'Current password is incorrect' });
+    }
+
+    // Hash the new password
+    const newHashedPassword = await bcrypt.hash(newPassword, 12);
+
+    // Update the password in the database
+    const updateQuery = "UPDATE users SET password_hash = ? WHERE id = ?";
+    db.run(updateQuery, [newHashedPassword, req.user.id], function(err) {
+      if (err) {
+        console.error('Database error updating password:', err);
+        return res.status(500).json({ message: 'Internal server error' });
+      }
+
+      if (this.changes === 0) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      res.json({ message: 'Password changed successfully' });
     });
   });
 });
