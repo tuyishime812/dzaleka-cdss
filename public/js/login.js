@@ -45,6 +45,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         case 'staff':
                             window.location.href = '/staff';
                             break;
+                        case 'admin':
+                            window.location.href = '/admin';
+                            break;
                         default:
                             alert('Unknown user role');
                             break;

@@ -6,205 +6,572 @@
     <title>Admin Dashboard - School Portal</title>
     <link rel="stylesheet" href="/css/style.css">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .sidebar {
+            min-height: 100vh;
+            background: linear-gradient(180deg, #1a2a6c, #2a4a8c);
+            color: white;
+        }
+        .sidebar .nav-link {
+            color: rgba(255, 255, 255, 0.8);
+            padding: 12px 20px;
+            border-radius: 5px;
+            margin: 5px 10px;
+            transition: all 0.3s;
+        }
+        .sidebar .nav-link:hover, .sidebar .nav-link.active {
+            color: white;
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .main-content {
+            background-color: #f8f9fa;
+            min-height: 100vh;
+        }
+        .stat-card {
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        .admin-header {
+            background: linear-gradient(135deg, #007bff, #0062cc);
+            color: white;
+            padding: 20px 0;
+            margin-bottom: 20px;
+            border-radius: 10px;
+        }
+        .section-title {
+            position: relative;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #dee2e6;
+        }
+        .section-title:after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 50px;
+            height: 2px;
+            background: #007bff;
+        }
+    </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container">
-            <a class="navbar-brand" href="/">School Portal</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="/">Home</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/admin">Admin Dashboard</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/logout">Logout</a>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </nav>
-
-    <div class="container mt-5">
+    <div class="container-fluid">
         <div class="row">
-            <div class="col-md-12">
-                <h2>Administrator Dashboard</h2>
-                <p>Welcome, Administrator! You can manage users, view system statistics, and monitor school performance.</p>
+            <!-- Sidebar -->
+            <div class="col-md-3 col-lg-2 px-0">
+                <div class="sidebar p-3">
+                    <h4 class="text-center mb-4"><i class="fas fa-school me-2"></i>School Portal</h4>
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link active" href="/admin">
+                                <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" onclick="showSection('users-management')">
+                                <i class="fas fa-users me-2"></i>User Management
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" onclick="showSection('announcements')">
+                                <i class="fas fa-bullhorn me-2"></i>Announcements
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" onclick="showSection('posts-content')">
+                                <i class="fas fa-file-alt me-2"></i>Posts & Content
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" onclick="showSection('grades-management')">
+                                <i class="fas fa-chart-bar me-2"></i>Grades Management
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/logout">
+                                <i class="fas fa-sign-out-alt me-2"></i>Logout
+                            </a>
+                        </li>
+                    </ul>
+                </div>
             </div>
-        </div>
 
-        <!-- Stats Cards -->
-        <div class="row mt-4">
-            <div class="col-md-3">
-                <div class="card text-center bg-primary text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Total Users</h5>
-                        <h3 id="totalUsersCount">0</h3>
+            <!-- Main Content -->
+            <div class="col-md-9 col-lg-10 main-content">
+                <div class="container-fluid">
+                    <!-- Header -->
+                    <div class="admin-header text-center mb-4">
+                        <h2><i class="fas fa-user-shield me-2"></i>Administrator Dashboard</h2>
+                        <p class="mb-0">Welcome, Administrator! Manage your school portal efficiently</p>
                     </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card text-center bg-success text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Students</h5>
-                        <h3 id="totalStudentsCount">0</h3>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card text-center bg-info text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Staff</h5>
-                        <h3 id="totalStaffCount">0</h3>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card text-center bg-warning text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Grades</h5>
-                        <h3 id="totalGradesCount">0</h3>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <div class="row mt-4">
-            <div class="col-md-8">
-                <div class="card">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0">Grade Performance Overview</h5>
-                    </div>
-                    <div class="card-body">
-                        <canvas id="performanceChart" width="400" height="200"></canvas>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0">User Roles Distribution</h5>
-                    </div>
-                    <div class="card-body">
-                        <canvas id="roleDistributionChart" width="200" height="200"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="row mt-4">
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0">Top Performing Subjects</h5>
-                    </div>
-                    <div class="card-body">
-                        <div id="topSubjectsChartContainer">
-                            <canvas id="topSubjectsChart" width="200" height="200"></canvas>
+                    <!-- Stats Cards -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card stat-card bg-primary text-white">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <h5 class="card-title">Total Users</h5>
+                                            <h3 id="totalUsersCount">0</h3>
+                                        </div>
+                                        <div class="align-self-center">
+                                            <i class="fas fa-users fa-2x"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card stat-card bg-success text-white">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <h5 class="card-title">Students</h5>
+                                            <h3 id="totalStudentsCount">0</h3>
+                                        </div>
+                                        <div class="align-self-center">
+                                            <i class="fas fa-graduation-cap fa-2x"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card stat-card bg-info text-white">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <h5 class="card-title">Staff</h5>
+                                            <h3 id="totalStaffCount">0</h3>
+                                        </div>
+                                        <div class="align-self-center">
+                                            <i class="fas fa-chalkboard-teacher fa-2x"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card stat-card bg-warning text-white">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <h5 class="card-title">Grades</h5>
+                                            <h3 id="totalGradesCount">0</h3>
+                                        </div>
+                                        <div class="align-self-center">
+                                            <i class="fas fa-chart-line fa-2x"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0">Grade Trends</h5>
-                    </div>
-                    <div class="card-body">
-                        <canvas id="gradeTrendsChart" width="200" height="200"></canvas>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0">Top Students</h5>
-                    </div>
-                    <div class="card-body">
-                        <div id="topStudentsList">
-                            <!-- Top students will be loaded here -->
+
+                    <!-- Dashboard Content -->
+                    <div id="dashboard-content">
+                        <!-- Analytics Charts -->
+                        <div class="row mb-4">
+                            <div class="col-md-8">
+                                <div class="card h-100">
+                                    <div class="card-header bg-primary text-white">
+                                        <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Grade Performance Overview</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <canvas id="performanceChart" width="400" height="200"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card h-100">
+                                    <div class="card-header bg-primary text-white">
+                                        <h5 class="mb-0"><i class="fas fa-pie-chart me-2"></i>User Roles Distribution</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <canvas id="roleDistributionChart" width="200" height="200"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-md-4">
+                                <div class="card h-100">
+                                    <div class="card-header bg-primary text-white">
+                                        <h5 class="mb-0"><i class="fas fa-trophy me-2"></i>Top Performing Subjects</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <canvas id="topSubjectsChart" width="200" height="200"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card h-100">
+                                    <div class="card-header bg-primary text-white">
+                                        <h5 class="mb-0"><i class="fas fa-line-chart me-2"></i>Grade Trends</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <canvas id="gradeTrendsChart" width="200" height="200"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card h-100">
+                                    <div class="card-header bg-primary text-white">
+                                        <h5 class="mb-0"><i class="fas fa-star me-2"></i>Top Students</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="topStudentsList">
+                                            <!-- Top students will be loaded here -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
 
-        <div class="row mt-4">
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0">Add New User</h5>
-                    </div>
-                    <div class="card-body">
-                        <form id="addUserForm">
-                            <div class="mb-3">
-                                <label for="newUsername" class="form-label">Username</label>
-                                <input type="text" class="form-control" id="newUsername" required>
-                            </div>
-                            <div class="mb-3">
-                                <label for="newEmail" class="form-label">Email</label>
-                                <input type="email" class="form-control" id="newEmail" required>
-                            </div>
-                            <div class="mb-3">
-                                <label for="newRole" class="form-label">Role</label>
-                                <select class="form-control" id="newRole" required>
-                                    <option value="student">Student</option>
-                                    <option value="staff">Staff</option>
-                                    <option value="admin">Admin</option>
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label for="newPassword" class="form-label">Password</label>
-                                <input type="password" class="form-control" id="newPassword" required>
-                            </div>
-                            <button type="submit" class="btn btn-success">Add User</button>
-                        </form>
-                    </div>
-                </div>
-            </div>
+                    <!-- Users Management Section -->
+                    <div id="users-management" class="content-section" style="display:none;">
+                        <h3 class="section-title"><i class="fas fa-users me-2"></i>User Management</h3>
 
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0">User Management</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-striped" id="usersTable">
-                                <thead class="table-dark">
-                                    <tr>
-                                        <th>ID</th>
-                                        <th>Username</th>
-                                        <th>Email</th>
-                                        <th>Role</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <!-- User data will be loaded here dynamically -->
-                                </tbody>
-                            </table>
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header bg-primary text-white">
+                                        <h5 class="mb-0"><i class="fas fa-plus-circle me-2"></i>Add New User</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <form id="addUserForm">
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label for="newUsername" class="form-label">Username</label>
+                                                        <input type="text" class="form-control" id="newUsername" required>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label for="newEmail" class="form-label">Email</label>
+                                                        <input type="email" class="form-control" id="newEmail" required>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label for="newRole" class="form-label">Role</label>
+                                                        <select class="form-control" id="newRole" required>
+                                                            <option value="student">Student</option>
+                                                            <option value="staff">Staff</option>
+                                                            <option value="admin">Admin</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label for="newPassword" class="form-label">Password</label>
+                                                        <input type="password" class="form-control" id="newPassword" required>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button type="submit" class="btn btn-success"><i class="fas fa-save me-2"></i>Add User</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header bg-primary text-white">
+                                        <h5 class="mb-0"><i class="fas fa-search me-2"></i>Filter Users</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-8">
+                                                <input type="text" class="form-control" id="userSearch" placeholder="Search users...">
+                                            </div>
+                                            <div class="col-md-4">
+                                                <select class="form-control" id="roleFilter">
+                                                    <option value="">All Roles</option>
+                                                    <option value="student">Student</option>
+                                                    <option value="staff">Staff</option>
+                                                    <option value="admin">Admin</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0"><i class="fas fa-list me-2"></i>Users List</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover" id="usersTable">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th>ID</th>
+                                                <th>Username</th>
+                                                <th>Email</th>
+                                                <th>Role</th>
+                                                <th>Created At</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- User data will be loaded here dynamically -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
 
-        <div class="row mt-4">
-            <div class="col-md-12">
-                <div class="card">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0">Recent Activity</h5>
+                    <!-- Announcements Section -->
+                    <div id="announcements" class="content-section" style="display:none;">
+                        <h3 class="section-title"><i class="fas fa-bullhorn me-2"></i>Announcements</h3>
+
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header bg-primary text-white">
+                                        <h5 class="mb-0"><i class="fas fa-plus-circle me-2"></i>Create Announcement</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <form id="createAnnouncementForm">
+                                            <div class="mb-3">
+                                                <label for="announcementTitle" class="form-label">Title</label>
+                                                <input type="text" class="form-control" id="announcementTitle" required>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="announcementContent" class="form-label">Content</label>
+                                                <textarea class="form-control" id="announcementContent" rows="4" required></textarea>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="announcementDate" class="form-label">Date</label>
+                                                <input type="date" class="form-control" id="announcementDate" required>
+                                            </div>
+                                            <button type="submit" class="btn btn-success"><i class="fas fa-bullhorn me-2"></i>Post Announcement</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header bg-primary text-white">
+                                        <h5 class="mb-0"><i class="fas fa-history me-2"></i>Recent Announcements</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="recentAnnouncements">
+                                            <!-- Announcements will be loaded here -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0"><i class="fas fa-list me-2"></i>All Announcements</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover" id="announcementsTable">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th>ID</th>
+                                                <th>Title</th>
+                                                <th>Content</th>
+                                                <th>Date</th>
+                                                <th>Author</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- Announcements will be loaded here dynamically -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <div id="recentActivity">
-                            <!-- Recent activity will be loaded here dynamically -->
+
+                    <!-- Posts & Content Section -->
+                    <div id="posts-content" class="content-section" style="display:none;">
+                        <h3 class="section-title"><i class="fas fa-file-alt me-2"></i>Posts & Content</h3>
+
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header bg-primary text-white">
+                                        <h5 class="mb-0"><i class="fas fa-plus-circle me-2"></i>Create Post</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <form id="createPostForm">
+                                            <div class="mb-3">
+                                                <label for="postTitle" class="form-label">Title</label>
+                                                <input type="text" class="form-control" id="postTitle" required>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="postContent" class="form-label">Content</label>
+                                                <textarea class="form-control" id="postContent" rows="5" required></textarea>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="postCategory" class="form-label">Category</label>
+                                                <select class="form-control" id="postCategory" required>
+                                                    <option value="news">News</option>
+                                                    <option value="event">Event</option>
+                                                    <option value="notice">Notice</option>
+                                                    <option value="resource">Resource</option>
+                                                </select>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="postDate" class="form-label">Date</label>
+                                                <input type="date" class="form-control" id="postDate" required>
+                                            </div>
+                                            <button type="submit" class="btn btn-success"><i class="fas fa-file-upload me-2"></i>Publish Post</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="card h-100">
+                                    <div class="card-header bg-primary text-white">
+                                        <h5 class="mb-0"><i class="fas fa-filter me-2"></i>Content Management</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <label for="contentSearch" class="form-label">Search Content</label>
+                                            <input type="text" class="form-control" id="contentSearch" placeholder="Search posts...">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="categoryFilter" class="form-label">Filter by Category</label>
+                                            <select class="form-control" id="categoryFilter">
+                                                <option value="">All Categories</option>
+                                                <option value="news">News</option>
+                                                <option value="event">Event</option>
+                                                <option value="notice">Notice</option>
+                                                <option value="resource">Resource</option>
+                                            </select>
+                                        </div>
+                                        <div class="mt-4">
+                                            <h6><i class="fas fa-cog me-2"></i>Site Settings</h6>
+                                            <button class="btn btn-outline-primary btn-sm me-2"><i class="fas fa-sync-alt me-1"></i>Refresh Data</button>
+                                            <button class="btn btn-outline-warning btn-sm"><i class="fas fa-trash-alt me-1"></i>Clear Cache</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0"><i class="fas fa-list me-2"></i>All Posts & Content</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover" id="postsTable">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th>ID</th>
+                                                <th>Title</th>
+                                                <th>Category</th>
+                                                <th>Content Preview</th>
+                                                <th>Date</th>
+                                                <th>Author</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- Posts will be loaded here dynamically -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grades Management Section -->
+                    <div id="grades-management" class="content-section" style="display:none;">
+                        <h3 class="section-title"><i class="fas fa-chart-bar me-2"></i>Grades Management</h3>
+
+                        <div class="row mb-4">
+                            <div class="col-md-12">
+                                <div class="card">
+                                    <div class="card-header bg-primary text-white">
+                                        <h5 class="mb-0"><i class="fas fa-download me-2"></i>Grades Overview</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-3">
+                                                <div class="text-center p-3 bg-light rounded">
+                                                    <h4 id="totalGradesCountOverview">0</h4>
+                                                    <p class="mb-0">Total Grades</p>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="text-center p-3 bg-light rounded">
+                                                    <h4 id="avgGradeValue">0%</h4>
+                                                    <p class="mb-0">Average Grade</p>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="text-center p-3 bg-light rounded">
+                                                    <h4 id="highestGradeValue">0%</h4>
+                                                    <p class="mb-0">Highest Grade</p>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="text-center p-3 bg-light rounded">
+                                                    <h4 id="lowestGradeValue">0%</h4>
+                                                    <p class="mb-0">Lowest Grade</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0"><i class="fas fa-list me-2"></i>All Grades</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover" id="gradesTable">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th>ID</th>
+                                                <th>Student ID</th>
+                                                <th>Student Name</th>
+                                                <th>Subject</th>
+                                                <th>Exam Type</th>
+                                                <th>Grade</th>
+                                                <th>Date</th>
+                                                <th>Teacher</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- Grades will be loaded here dynamically -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -216,9 +583,9 @@
     <div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="editUserModalLabel">Edit User</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="editUserModalLabel"><i class="fas fa-edit me-2"></i>Edit User</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <form id="editUserForm">
@@ -249,11 +616,38 @@
         </div>
     </div>
 
-    <footer class="footer mt-5 py-4 bg-light">
-        <div class="container text-center">
-            <span class="text-muted">© 2026 School Portal. All rights reserved.</span>
+    <!-- Edit Announcement Modal -->
+    <div class="modal fade" id="editAnnouncementModal" tabindex="-1" aria-labelledby="editAnnouncementModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="editAnnouncementModalLabel"><i class="fas fa-edit me-2"></i>Edit Announcement</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editAnnouncementForm">
+                        <input type="hidden" id="editAnnouncementId">
+                        <div class="mb-3">
+                            <label for="editAnnouncementTitle" class="form-label">Title</label>
+                            <input type="text" class="form-control" id="editAnnouncementTitle" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editAnnouncementContent" class="form-label">Content</label>
+                            <textarea class="form-control" id="editAnnouncementContent" rows="4" required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editAnnouncementDate" class="form-label">Date</label>
+                            <input type="date" class="form-control" id="editAnnouncementDate" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="saveAnnouncementBtn">Save Changes</button>
+                </div>
+            </div>
         </div>
-    </footer>
+    </div>
 
     <script src="/js/admin.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

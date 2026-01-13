@@ -148,7 +148,7 @@ app.post('/api/users/login', loginLimiter, (req, res) => {
 });
 
 // Logout route
-app.post('/api/users/logout', (req, res) => {
+REPLACED
   req.session.destroy((err) => {
     if (err) {
       return res.status(500).json({ message: 'Could not log out' });

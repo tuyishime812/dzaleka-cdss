@@ -4,8 +4,8 @@
   "description": "A school portal for teachers to upload grades and students to check exam results",
   "main": "server.js",
   "scripts": {
-    "start": "node server_no_jwt.js",
-    "dev": "node server_no_jwt.js",
+    "start": "node server_complete.js",
+    "dev": "node server_complete.js",
     "build": "echo \"Build not required for this application\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
