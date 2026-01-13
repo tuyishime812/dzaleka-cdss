@@ -4,8 +4,8 @@
   "description": "A school portal for teachers to upload grades and students to check exam results",
   "main": "server.js",
   "scripts": {
-    "start": "node server_barebones.js",
-    "dev": "node server_barebones.js",
+    "start": "node server_no_jwt.js",
+    "dev": "node server_no_jwt.js",
     "build": "echo \"Build not required for this application\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -23,6 +23,7 @@
     "dotenv": "^16.6.1",
     "express": "^4.22.1",
     "express-rate-limit": "^7.5.1",
+    "express-session": "^1.18.2",
     "helmet": "^7.2.0",
     "jsonwebtoken": "^9.0.3",
     "pg": "^8.11.3",

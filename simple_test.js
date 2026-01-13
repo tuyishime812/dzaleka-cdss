@@ -3,7 +3,6 @@ require('dotenv').config();
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
-const rateLimit = require('express-rate-limit');
 
 const app = express();
 
@@ -11,15 +10,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Rate limiting for login
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  message: { error: 'Too many login attempts, please try again later.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
 
 // Test users
 const users = [
@@ -31,26 +21,8 @@ const users = [
   { id: 6, username: 'tuyishime_student', email: 'tuyishime_student@student.edu', password: 'student123', role: 'student' }
 ];
 
-// Authentication middleware
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ message: 'Access token required' });
-  }
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret_key');
-    req.user = decoded;
-    next();
-  } catch (err) {
-    return res.status(403).json({ message: 'Invalid or expired token' });
-  }
-};
-
 // Login route
-app.post('/api/users/login', loginLimiter, (req, res) => {
+app.post('/api/users/login', (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
@@ -86,22 +58,17 @@ app.post('/api/users/login', loginLimiter, (req, res) => {
   });
 });
 
-// Test route
-app.get('/api/test', authenticateToken, (req, res) => {
-  res.json({ message: 'Authenticated successfully!', user: req.user });
-});
-
 // Root route
 app.get('/', (req, res) => {
-  res.json({ message: 'Server is running!', status: 'ok' });
+  res.json({ message: 'Simple test server is running!', status: 'ok' });
 });
 
-const PORT = process.env.PORT || 5000;
+// Use a fixed port to avoid conflicts
+const PORT = 8080;
 app.listen(PORT, () => {
-  console.log(`Test server running on port ${PORT}`);
+  console.log(`Simple test server running on port ${PORT}`);
   console.log('Available endpoints:');
   console.log('  POST /api/users/login - Login with username and password');
-  console.log('  GET /api/test - Test authentication (requires token)');
   console.log('');
   console.log('Test credentials:');
   console.log('  Staff: emmanuel / staff123');
