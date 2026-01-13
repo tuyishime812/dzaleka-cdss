@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: dzaleka-school-portal
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+    autoDeploy: false
+    healthCheckPath: /
+    numInstances: 1
+    plan: free
+    region: oregon
+
+databases:
+  - name: school-portal-db
+    databaseName: school_portal
+    user: postgres
+    plan: free
+    region: oregon

@@ -7,8 +7,7 @@ const helmet = require('helmet');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const validator = require('validator');
-const sqlite = require('sqlite');
-const sqlite3 = require('sqlite3');
+const { Pool } = require('pg');
 require('dotenv').config();
 
 // Create Express app
@@ -48,72 +47,86 @@ app.use(express.urlencoded({ extended: true }));
 // Serve static files from the public directory
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Initialize SQLite database
-const dbPath = path.join(__dirname, '../database.db');
+// Initialize PostgreSQL database
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL ||
+    `postgresql://${process.env.DB_USER || 'postgres'}:${
+      process.env.DB_PASSWORD || 'postgres'
+    }@${process.env.DB_HOST || 'localhost'}:${
+      process.env.DB_PORT || '5432'
+    }/${process.env.DB_NAME || 'school_portal'}`,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
 
-// Open database connection
-let db;
+// Test the database connection
+pool.query('SELECT NOW()', (err, res) => {
+  if (err) {
+    console.error('Database connection error:', err.stack);
+  } else {
+    console.log('Connected to PostgreSQL database');
+  }
+});
 
+// Create tables if they don't exist
 async function initializeDatabase() {
   try {
-    db = await sqlite.open({
-      filename: dbPath,
-      driver: sqlite3.Database
-    });
-
-    // Create tables if they don't exist
-    await db.run(`
+    // Create users table
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
-        email TEXT UNIQUE NOT NULL,
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(255) UNIQUE NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
-        role TEXT NOT NULL DEFAULT 'student',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        role VARCHAR(50) NOT NULL DEFAULT 'student',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
-    await db.run(`
+    // Create students table
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS students (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        student_id TEXT UNIQUE NOT NULL,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        class TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        id SERIAL PRIMARY KEY,
+        student_id VARCHAR(255) UNIQUE NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        class VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
-    await db.run(`
+    // Create subjects table
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS subjects (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT UNIQUE NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) UNIQUE NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
-    await db.run(`
+    // Create grades table
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS grades (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        student_id TEXT NOT NULL,
-        subject TEXT NOT NULL,
-        exam_type TEXT NOT NULL,
-        grade REAL NOT NULL,
+        id SERIAL PRIMARY KEY,
+        student_id VARCHAR(255) NOT NULL,
+        subject VARCHAR(255) NOT NULL,
+        exam_type VARCHAR(255) NOT NULL,
+        grade DECIMAL(5,2) NOT NULL,
         date DATE NOT NULL,
         teacher_id INTEGER,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (teacher_id) REFERENCES users(id)
       )
     `);
 
-    await db.run(`
+    // Create announcements table
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS announcements (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
         content TEXT NOT NULL,
         date DATE NOT NULL,
-        author_name TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        author_name VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
@@ -123,7 +136,7 @@ async function initializeDatabase() {
     // Initialize default subjects if they don't exist
     await initializeDefaultSubjects();
 
-    console.log('Connected to SQLite database and initialized tables');
+    console.log('PostgreSQL tables initialized');
   } catch (err) {
     console.error('Error initializing database:', err);
   }
@@ -136,9 +149,10 @@ initializeDatabase();
 const initializeDefaultUsers = async () => {
   // Check if default users already exist
   try {
-    const row = await db.get("SELECT COUNT(*) as count FROM users");
+    const result = await pool.query("SELECT COUNT(*) as count FROM users");
+    const count = parseInt(result.rows[0].count);
 
-    if (row.count === 0) {
+    if (count === 0) {
       // Hash passwords and insert default users
       const adminHash = bcrypt.hashSync('admin123', 10);
       const staffHash = bcrypt.hashSync('staff123', 10);
@@ -155,8 +169,10 @@ const initializeDefaultUsers = async () => {
       ];
 
       for (const user of defaultUsers) {
-        await db.run("INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)",
-          user.username, user.email, user.password_hash, user.role);
+        await pool.query(
+          "INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4)",
+          [user.username, user.email, user.password_hash, user.role]
+        );
       }
       console.log('Default users inserted');
     }
@@ -196,15 +212,16 @@ setInterval(() => {
 const initializeDefaultSubjects = async () => {
   // Check if default subjects already exist
   try {
-    const row = await db.get("SELECT COUNT(*) as count FROM subjects");
+    const result = await pool.query("SELECT COUNT(*) as count FROM subjects");
+    const count = parseInt(result.rows[0].count);
 
-    if (row.count === 0) {
+    if (count === 0) {
       const defaultSubjects = [
         'Mathematics', 'English', 'Science', 'History', 'Geography'
       ];
 
       for (const subject of defaultSubjects) {
-        await db.run("INSERT INTO subjects (name) VALUES (?)", subject);
+        await pool.query("INSERT INTO subjects (name) VALUES ($1)", [subject]);
       }
       console.log('Default subjects inserted');
     }
@@ -214,7 +231,7 @@ const initializeDefaultSubjects = async () => {
 };
 
 // Authentication middleware
-const authenticateToken = (req, res, next) => {
+const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
@@ -231,7 +248,7 @@ const authenticateToken = (req, res, next) => {
   jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret_key', {
     algorithms: ['HS256'],
     ignoreExpiration: false
-  }, (err, user) => {
+  }, async (err, user) => {
     if (err) {
       if (err.name === 'TokenExpiredError') {
         return res.status(403).json({ message: 'Token has expired. Please log in again.' });
@@ -243,8 +260,8 @@ const authenticateToken = (req, res, next) => {
 
     try {
       // Additional security check: ensure user exists in database
-      const userStmt = db.prepare("SELECT id, username, role FROM users WHERE id = ?");
-      const dbUser = userStmt.get(user.id);
+      const result = await pool.query("SELECT id, username, role FROM users WHERE id = $1", [user.id]);
+      const dbUser = result.rows[0];
 
       if (!dbUser) {
         return res.status(403).json({ message: 'User no longer exists' });
@@ -315,8 +332,8 @@ app.post('/api/users/login', loginLimiter, async (req, res) => {
 
   try {
     // Query the database for the user
-    const userStmt = db.prepare("SELECT * FROM users WHERE username = ?");
-    const user = userStmt.get(sanitizedUsername);
+    const result = await pool.query("SELECT * FROM users WHERE username = $1", [sanitizedUsername]);
+    const user = result.rows[0];
 
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
@@ -364,7 +381,7 @@ app.post('/api/users/login', loginLimiter, async (req, res) => {
 });
 
 // Student grades routes
-app.get('/api/grades/student/:studentId', authenticateToken, (req, res) => {
+app.get('/api/grades/student/:studentId', authenticateToken, async (req, res) => {
   const { studentId } = req.params;
 
   // Validate studentId parameter
@@ -389,12 +406,12 @@ app.get('/api/grades/student/:studentId', authenticateToken, (req, res) => {
       SELECT g.*, u.username as teacher_name
       FROM grades g
       LEFT JOIN users u ON g.teacher_id = u.id
-      WHERE g.student_id = ?
+      WHERE g.student_id = $1
       ORDER BY g.created_at DESC
     `;
 
-    const stmt = db.prepare(query);
-    const rows = stmt.all(sanitizedStudentId);
+    const result = await pool.query(query, [sanitizedStudentId]);
+    const rows = result.rows;
 
     res.json(rows);
   } catch (err) {
@@ -404,7 +421,7 @@ app.get('/api/grades/student/:studentId', authenticateToken, (req, res) => {
 });
 
 // Staff grades routes - staff can view all grades
-app.get('/api/grades/staff', authenticateToken, authorizeRole(['staff']), (req, res) => {
+app.get('/api/grades/staff', authenticateToken, authorizeRole(['staff']), async (req, res) => {
   try {
     // Query the database for all grades with student information
     const query = `
@@ -415,8 +432,8 @@ app.get('/api/grades/staff', authenticateToken, authorizeRole(['staff']), (req, 
       ORDER BY g.created_at DESC
     `;
 
-    const stmt = db.prepare(query);
-    const rows = stmt.all();
+    const result = await pool.query(query);
+    const rows = result.rows;
 
     res.json(rows);
   } catch (err) {
@@ -425,7 +442,7 @@ app.get('/api/grades/staff', authenticateToken, authorizeRole(['staff']), (req, 
   }
 });
 
-app.post('/api/grades', authenticateToken, authorizeRole(['staff']), (req, res) => {
+app.post('/api/grades', authenticateToken, authorizeRole(['staff']), async (req, res) => {
   const { studentId, subject, examType, grade, date } = req.body;
 
   // Validate required fields
@@ -451,16 +468,16 @@ app.post('/api/grades', authenticateToken, authorizeRole(['staff']), (req, res) 
 
   try {
     // Check if student exists
-    const studentStmt = db.prepare("SELECT id FROM students WHERE student_id = ?");
-    const student = studentStmt.get(sanitizedStudentId);
+    const studentResult = await pool.query("SELECT id FROM students WHERE student_id = $1", [sanitizedStudentId]);
+    const student = studentResult.rows[0];
 
     if (!student) {
       return res.status(404).json({ message: 'Student not found' });
     }
 
     // Check if subject exists
-    const subjectStmt = db.prepare("SELECT id FROM subjects WHERE name = ?");
-    const subjectRecord = subjectStmt.get(sanitizedSubject);
+    const subjectResult = await pool.query("SELECT id FROM subjects WHERE name = $1", [sanitizedSubject]);
+    const subjectRecord = subjectResult.rows[0];
 
     if (!subjectRecord) {
       return res.status(404).json({ message: 'Subject not found' });
@@ -472,15 +489,15 @@ app.post('/api/grades', authenticateToken, authorizeRole(['staff']), (req, res) 
     // Insert the new grade into the database
     const insertQuery = `
       INSERT INTO grades (student_id, subject, exam_type, grade, date, teacher_id)
-      VALUES (?, ?, ?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id
     `;
 
-    const insertStmt = db.prepare(insertQuery);
-    const result = insertStmt.run(sanitizedStudentId, sanitizedSubject, sanitizedExamType, validatedGrade, date, staffId);
+    const result = await pool.query(insertQuery, [sanitizedStudentId, sanitizedSubject, sanitizedExamType, validatedGrade, date, staffId]);
 
     // Return the newly created grade
     const newGrade = {
-      id: result.lastInsertRowid,
+      id: result.rows[0].id,
       student_id: sanitizedStudentId,
       subject: sanitizedSubject,
       exam_type: sanitizedExamType,
