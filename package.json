@@ -4,8 +4,8 @@
   "description": "A school portal for teachers to upload grades and students to check exam results",
   "main": "server.js",
   "scripts": {
-    "start": "node server_fixed.js",
-    "dev": "node server_fixed.js",
+    "start": "node server_minimal.js",
+    "dev": "node server_minimal.js",
     "build": "echo \"Build not required for this application\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
