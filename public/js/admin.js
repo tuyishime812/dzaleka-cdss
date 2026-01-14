@@ -1,5 +1,15 @@
 // Admin dashboard functionality
 document.addEventListener('DOMContentLoaded', function() {
+    // Check if user is authenticated and has admin role
+    const token = localStorage.getItem('token');
+    const role = localStorage.getItem('role');
+
+    if (!token || role !== 'admin') {
+        alert('Access denied. Administrative privileges required.');
+        window.location.href = '/login';
+        return;
+    }
+
     // Load initial data
     loadUserData();
     loadSystemStats();
@@ -284,8 +294,15 @@ function filterPosts(searchTerm = '', categoryFilter = '') {
 
 // Function to load user data
 async function loadUserData() {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     try {
-        const response = await fetch('/api/admin/users');
+        const response = await fetch('/api/admin/users', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
 
         if (response.ok) {
             const users = await response.json();
@@ -360,7 +377,8 @@ async function addUser(event) {
         const response = await fetch('/api/admin/users', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
                 username: username,
@@ -421,7 +439,8 @@ async function updateUser() {
         const response = await fetch(`/api/admin/users/${userId}`, {
             method: 'PUT',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
                 username: username,
@@ -466,7 +485,7 @@ async function deleteUser(userId, username) {
         const response = await fetch(`/api/admin/users/${userId}`, {
             method: 'DELETE',
             headers: {
-                'Content-Type': 'application/json'
+                'Authorization': `Bearer ${token}`
             }
         });
 
@@ -489,9 +508,16 @@ async function deleteUser(userId, username) {
 
 // Function to load system statistics
 async function loadSystemStats() {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     try {
         // Get all users
-        const usersResponse = await fetch('/api/admin/users');
+        const usersResponse = await fetch('/api/admin/users', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
 
         if (usersResponse.ok) {
             const users = await usersResponse.json();
@@ -508,7 +534,11 @@ async function loadSystemStats() {
             document.getElementById('totalStaffCount').textContent = totalStaff;
 
             // Also update the grades count
-            const gradesResponse = await fetch('/api/grades/staff');
+            const gradesResponse = await fetch('/api/grades/staff', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
 
             if (gradesResponse.ok) {
                 const grades = await gradesResponse.json();
@@ -543,9 +573,16 @@ async function loadSystemStats() {
 
 // Function to load charts
 async function loadCharts() {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     try {
         // Get all users
-        const usersResponse = await fetch('/api/admin/users');
+        const usersResponse = await fetch('/api/admin/users', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
 
         if (usersResponse.ok) {
             const users = await usersResponse.json();
@@ -593,7 +630,11 @@ async function loadCharts() {
 
         // Since we don't have grade-summary endpoint yet, we'll simulate the data
         // In a real scenario, you'd fetch from the actual endpoint
-        const gradesResponse = await fetch('/api/grades/staff');
+        const gradesResponse = await fetch('/api/grades/staff', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
 
         if (gradesResponse.ok) {
             const grades = await gradesResponse.json();
@@ -769,8 +810,15 @@ async function loadCharts() {
 
 // Function to load announcements
 async function loadAnnouncements() {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     try {
-        const response = await fetch('/api/staff/announcements');
+        const response = await fetch('/api/staff/announcements', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
 
         if (response.ok) {
             const announcements = await response.json();
@@ -852,7 +900,8 @@ async function createAnnouncement(event) {
         const response = await fetch('/api/staff/announcements', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
                 title: title,
@@ -911,7 +960,8 @@ async function updateAnnouncement() {
         const response = await fetch(`/api/staff/announcements/${announcementId}`, {
             method: 'PUT',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
                 title: title,
@@ -955,7 +1005,7 @@ async function deleteAnnouncement(announcementId, title) {
         const response = await fetch(`/api/staff/announcements/${announcementId}`, {
             method: 'DELETE',
             headers: {
-                'Content-Type': 'application/json'
+                'Authorization': `Bearer ${token}`
             }
         });
 
@@ -977,8 +1027,15 @@ async function deleteAnnouncement(announcementId, title) {
 
 // Function to load posts
 async function loadPosts() {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     try {
-        const response = await fetch('/api/posts');
+        const response = await fetch('/api/posts', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
 
         if (response.ok) {
             const posts = await response.json();
@@ -1041,7 +1098,8 @@ async function createPost(event) {
         const response = await fetch('/api/posts', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
                 title: title,
@@ -1152,7 +1210,8 @@ async function updatePost() {
         const response = await fetch(`/api/posts/${postId}`, {
             method: 'PUT',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
                 title: title,
@@ -1200,7 +1259,7 @@ async function deletePost(postId, title) {
         const response = await fetch(`/api/posts/${postId}`, {
             method: 'DELETE',
             headers: {
-                'Content-Type': 'application/json'
+                'Authorization': `Bearer ${token}`
             }
         });
 
@@ -1222,8 +1281,15 @@ async function deletePost(postId, title) {
 
 // Function to load grades
 async function loadGrades() {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     try {
-        const response = await fetch('/api/grades/staff');
+        const response = await fetch('/api/grades/staff', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
 
         if (response.ok) {
             const grades = await response.json();
@@ -1397,7 +1463,8 @@ async function updateGrade() {
         const response = await fetch(`/api/grades/${gradeId}`, {
             method: 'PUT',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
                 studentId: studentId,
@@ -1447,7 +1514,7 @@ async function deleteGrade(gradeId) {
         const response = await fetch(`/api/grades/${gradeId}`, {
             method: 'DELETE',
             headers: {
-                'Content-Type': 'application/json'
+                'Authorization': `Bearer ${token}`
             }
         });
 

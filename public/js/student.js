@@ -1,20 +1,41 @@
 // Student dashboard functionality
 document.addEventListener('DOMContentLoaded', function() {
+    // Check if user is authenticated
+    const token = localStorage.getItem('token');
+    if (!token) {
+        window.location.href = '/login';
+        return;
+    }
+
     // Load student's grades
     loadStudentGrades();
-
+    
     // Load grade summary
     loadGradeSummary();
-
+    
     // Load announcements
     loadAnnouncements();
 });
 
 // Function to load student's grades
 async function loadStudentGrades() {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     // Get student ID from user data stored in localStorage
     // For students, we'll use the username as student ID
     const username = localStorage.getItem('username');
+    const role = localStorage.getItem('role');
+
+    // Only allow students to load their own grades
+    if (role !== 'student') {
+        console.error('Only students can access this page');
+        const tableBody = document.querySelector('#gradesTable tbody');
+        if (tableBody) {
+            tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Access denied. Only students can view grades.</td></tr>';
+        }
+        return;
+    }
 
     const studentId = username; // Use username as student ID
 
@@ -28,7 +49,11 @@ async function loadStudentGrades() {
     }
 
     try {
-        const response = await fetch(`/api/grades/student/${studentId}`);
+        const response = await fetch(`/api/grades/student/${studentId}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
 
         if (response.ok) {
             const grades = await response.json();
@@ -210,9 +235,23 @@ function updateGradeStatistics(grades) {
 
 // Function to load grade summary
 async function loadGradeSummary() {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     // Get student ID from user data stored in localStorage
     // For students, we'll use the username as student ID
     const username = localStorage.getItem('username');
+    const role = localStorage.getItem('role');
+
+    // Only allow students to load their own grades
+    if (role !== 'student') {
+        console.error('Only students can access this page');
+        const summaryContainer = document.getElementById('gradeSummary');
+        if (summaryContainer) {
+            summaryContainer.innerHTML = '<p>Access denied. Only students can view grades.</p>';
+        }
+        return;
+    }
 
     const studentId = username; // Use username as student ID
 
@@ -226,7 +265,11 @@ async function loadGradeSummary() {
     }
 
     try {
-        const response = await fetch(`/api/grades/student/${studentId}`);
+        const response = await fetch(`/api/grades/student/${studentId}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
 
         if (response.ok) {
             const grades = await response.json();
@@ -295,8 +338,15 @@ async function loadGradeSummary() {
 
 // Function to load announcements
 async function loadAnnouncements() {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     try {
-        const response = await fetch('/api/staff/announcements');
+        const response = await fetch('/api/staff/announcements', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
 
         if (response.ok) {
             const announcements = await response.json();

@@ -249,15 +249,27 @@ app.get('/login', (req, res) => {
 });
 
 
-app.get('/student', (req, res) => {
+app.get('/student', authenticateToken, (req, res) => {
+  // Only allow students to access student dashboard
+  if (req.user.role !== 'student') {
+    return res.status(403).send('Access denied. Students only.');
+  }
   res.sendFile(path.join(__dirname, 'public/student.html'));
 });
 
-app.get('/staff', (req, res) => {
+app.get('/staff', authenticateToken, (req, res) => {
+  // Only allow staff to access staff dashboard
+  if (req.user.role !== 'staff') {
+    return res.status(403).send('Access denied. Staff only.');
+  }
   res.sendFile(path.join(__dirname, 'public/staff.html'));
 });
 
-app.get('/admin', (req, res) => {
+app.get('/admin', authenticateToken, (req, res) => {
+  // Only allow admins to access admin dashboard
+  if (req.user.role !== 'admin') {
+    return res.status(403).send('Access denied. Admins only.');
+  }
   res.sendFile(path.join(__dirname, 'public/admin.html'));
 });
 

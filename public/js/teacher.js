@@ -1,5 +1,12 @@
 // Staff dashboard functionality
 document.addEventListener('DOMContentLoaded', function() {
+    // Check if user is authenticated
+    const token = localStorage.getItem('token');
+    if (!token) {
+        window.location.href = '/login';
+        return;
+    }
+
     // Set up the grade upload form
     const gradeUploadForm = document.getElementById('gradeUploadForm');
     if (gradeUploadForm) {
@@ -21,7 +28,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 const response = await fetch('/api/grades', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
                     },
                     body: JSON.stringify({
                         studentId: studentId,
@@ -70,8 +78,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Function to load all grades with optional search
 async function loadAllGrades(searchTerm = '') {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     try {
-        const response = await fetch('/api/grades/staff');
+        const response = await fetch('/api/grades/staff', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
 
         if (response.ok) {
             const grades = await response.json();
@@ -125,8 +140,15 @@ async function loadAllGrades(searchTerm = '') {
 
 // Function to load subjects
 async function loadSubjects() {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     try {
-        const response = await fetch('/api/subjects');
+        const response = await fetch('/api/subjects', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
 
         if (response.ok) {
             const subjects = await response.json();
@@ -163,6 +185,9 @@ async function loadSubjects() {
 
 // Function to add a new subject
 async function addSubject() {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     const newSubjectInput = document.getElementById('newSubject');
     if (!newSubjectInput) return;
 
@@ -176,7 +201,8 @@ async function addSubject() {
         const response = await fetch('/api/subjects', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({ name: subjectName })
         });
@@ -200,8 +226,15 @@ async function addSubject() {
 
 // Function to load students for the dropdown
 async function loadStudentsForDropdown() {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     try {
-        const response = await fetch('/api/students');
+        const response = await fetch('/api/students', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
 
         if (response.ok) {
             const students = await response.json();
@@ -238,6 +271,9 @@ async function loadStudentsForDropdown() {
 
 // Function to edit a grade
 async function editGrade(gradeId, studentId, subject, examType, grade, date) {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     // Create a modal for editing
     const modal = document.createElement('div');
     modal.className = 'modal fade';
@@ -314,8 +350,15 @@ async function editGrade(gradeId, studentId, subject, examType, grade, date) {
 
 // Function to load students for the edit form with the current value selected
 async function loadStudentsForEdit(currentStudentId) {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     try {
-        const response = await fetch('/api/students');
+        const response = await fetch('/api/students', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
 
         if (response.ok) {
             const students = await response.json();
@@ -343,8 +386,15 @@ async function loadStudentsForEdit(currentStudentId) {
 
 // Function to load subjects for the edit form with the current value selected
 async function loadSubjectsForEdit(currentSubject) {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     try {
-        const response = await fetch('/api/subjects');
+        const response = await fetch('/api/subjects', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
 
         if (response.ok) {
             const subjects = await response.json();
@@ -372,6 +422,9 @@ async function loadSubjectsForEdit(currentSubject) {
 
 // Function to update a grade
 async function updateGrade() {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     const gradeId = document.getElementById('editGradeId').value;
     const studentId = document.getElementById('editStudentId').value;
     const subject = document.getElementById('editSubject').value;
@@ -388,7 +441,8 @@ async function updateGrade() {
         const response = await fetch(`/api/grades/${gradeId}`, {
             method: 'PUT',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
                 studentId: studentId,
@@ -426,6 +480,9 @@ async function updateGrade() {
 
 // Function to delete a grade
 async function deleteGrade(gradeId) {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     if (!confirm('Are you sure you want to delete this grade?')) {
         return;
     }
@@ -434,7 +491,7 @@ async function deleteGrade(gradeId) {
         const response = await fetch(`/api/grades/${gradeId}`, {
             method: 'DELETE',
             headers: {
-                'Content-Type': 'application/json'
+                'Authorization': `Bearer ${token}`
             }
         });
 
@@ -456,8 +513,15 @@ async function deleteGrade(gradeId) {
 
 // Function to load students
 async function loadStudents() {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     try {
-        const response = await fetch('/api/students');
+        const response = await fetch('/api/students', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
 
         if (response.ok) {
             const students = await response.json();
@@ -492,8 +556,15 @@ async function loadStudents() {
 
 // Function to view a student's grades
 async function viewGrades(studentId) {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     try {
-        const response = await fetch(`/api/grades/student/${studentId}`);
+        const response = await fetch(`/api/grades/student/${studentId}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
 
         if (response.ok) {
             const grades = await response.json();
@@ -557,8 +628,15 @@ async function viewGrades(studentId) {
 
 // Function to load subjects
 async function loadSubjects() {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     try {
-        const response = await fetch('/api/subjects');
+        const response = await fetch('/api/subjects', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
 
         if (response.ok) {
             const subjects = await response.json();
@@ -623,8 +701,15 @@ async function loadSubjects() {
 
 // Function to load subjects list for management
 async function loadSubjectsList() {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     try {
-        const response = await fetch('/api/subjects');
+        const response = await fetch('/api/subjects', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
 
         if (response.ok) {
             const subjects = await response.json();
@@ -665,6 +750,9 @@ async function loadSubjectsList() {
 
 // Function to add a new subject
 async function addSubject() {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     const newSubjectInput = document.getElementById('newSubject');
     if (!newSubjectInput) return;
 
@@ -678,7 +766,8 @@ async function addSubject() {
         const response = await fetch('/api/subjects', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({ name: subjectName })
         });
