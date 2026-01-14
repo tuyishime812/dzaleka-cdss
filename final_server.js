@@ -4,6 +4,7 @@ const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 // Database initialization
@@ -181,10 +182,27 @@ db.serialize(() => {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.'
+});
+
+app.use(limiter);
+
+// Security headers
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  next();
+});
+
 // Middleware
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' })); // Increased limit for potential file uploads
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
@@ -231,15 +249,27 @@ app.get('/login', (req, res) => {
 });
 
 
-app.get('/student', (req, res) => {
+app.get('/student', authenticateToken, (req, res) => {
+  // Only allow students to access student dashboard
+  if (req.user.role !== 'student') {
+    return res.status(403).send('Access denied. Students only.');
+  }
   res.sendFile(path.join(__dirname, 'public/student.html'));
 });
 
-app.get('/staff', (req, res) => {
+app.get('/staff', authenticateToken, (req, res) => {
+  // Only allow staff to access staff dashboard
+  if (req.user.role !== 'staff') {
+    return res.status(403).send('Access denied. Staff only.');
+  }
   res.sendFile(path.join(__dirname, 'public/staff.html'));
 });
 
-app.get('/admin', (req, res) => {
+app.get('/admin', authenticateToken, (req, res) => {
+  // Only allow admins to access admin dashboard
+  if (req.user.role !== 'admin') {
+    return res.status(403).send('Access denied. Admins only.');
+  }
   res.sendFile(path.join(__dirname, 'public/admin.html'));
 });
 
@@ -249,14 +279,28 @@ app.get('/logout', (req, res) => {
 
 // Authentication routes
 app.post('/api/users/login', (req, res) => {
-  const { username, password } = req.body;
+  let { username, password } = req.body;
 
+  // Input validation
   if (!username || !password) {
     return res.status(400).json({ message: 'Username and password are required' });
   }
 
+  // Sanitize inputs
+  username = username.trim();
+  password = password.trim();
+
+  // Additional validation
+  if (username.length < 3 || username.length > 50) {
+    return res.status(400).json({ message: 'Username must be between 3 and 50 characters' });
+  }
+
+  if (password.length < 6 || password.length > 128) {
+    return res.status(400).json({ message: 'Password must be between 6 and 128 characters' });
+  }
+
   const query = 'SELECT id, username, password_hash, role FROM users WHERE username = ?';
-  
+
   db.get(query, [username], async (err, user) => {
     if (err) {
       console.error('Database error during login:', err);
@@ -264,6 +308,8 @@ app.post('/api/users/login', (req, res) => {
     }
 
     if (!user) {
+      // Add a small delay to prevent timing attacks
+      await new Promise(resolve => setTimeout(resolve, 100));
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
@@ -280,13 +326,14 @@ app.post('/api/users/login', (req, res) => {
         { expiresIn: '24h' }
       );
 
+      // Don't expose sensitive information in response
       res.json({
         message: 'Login successful',
         token: token,
-        user: { 
-          id: user.id, 
-          username: user.username, 
-          role: user.role 
+        user: {
+          id: user.id,
+          username: user.username,
+          role: user.role
         }
       });
     } catch (error) {
@@ -347,10 +394,48 @@ app.get('/api/grades/staff', authenticateToken, authorizeRole(['staff']), (req, 
 });
 
 app.post('/api/grades', authenticateToken, authorizeRole(['staff']), (req, res) => {
-  const { studentId, subject, examType, grade, date } = req.body;
+  let { studentId, subject, examType, grade, date } = req.body;
 
+  // Input validation and sanitization
   if (!studentId || !subject || !examType || grade === undefined || !date) {
     return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  // Sanitize inputs
+  studentId = studentId.trim();
+  subject = subject.trim();
+  examType = examType.trim();
+  date = date.trim();
+
+  // Validate inputs
+  if (studentId.length < 1 || studentId.length > 50) {
+    return res.status(400).json({ message: 'Student ID must be between 1 and 50 characters' });
+  }
+
+  if (subject.length < 1 || subject.length > 100) {
+    return res.status(400).json({ message: 'Subject must be between 1 and 100 characters' });
+  }
+
+  if (!['exam', 'quiz', 'assignment', 'project'].includes(examType.toLowerCase())) {
+    return res.status(400).json({ message: 'Exam type must be exam, quiz, assignment, or project' });
+  }
+
+  if (typeof grade !== 'number' || grade < 0 || grade > 100) {
+    return res.status(400).json({ message: 'Grade must be a number between 0 and 100' });
+  }
+
+  // Validate date format (YYYY-MM-DD)
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateRegex.test(date)) {
+    return res.status(400).json({ message: 'Date must be in YYYY-MM-DD format' });
+  }
+
+  // Validate that date is not in the future
+  const inputDate = new Date(date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (inputDate > today) {
+    return res.status(400).json({ message: 'Date cannot be in the future' });
   }
 
   // Staff member who is adding the grade
@@ -383,10 +468,53 @@ app.post('/api/grades', authenticateToken, authorizeRole(['staff']), (req, res) 
 // PUT route to update a grade
 app.put('/api/grades/:id', authenticateToken, authorizeRole(['staff']), (req, res) => {
   const { id } = req.params;
-  const { studentId, subject, examType, grade, date } = req.body;
+  let { studentId, subject, examType, grade, date } = req.body;
 
+  // Input validation and sanitization
   if (!studentId || !subject || !examType || grade === undefined || !date) {
     return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  // Sanitize inputs
+  studentId = studentId.trim();
+  subject = subject.trim();
+  examType = examType.trim();
+  date = date.trim();
+
+  // Validate inputs
+  if (studentId.length < 1 || studentId.length > 50) {
+    return res.status(400).json({ message: 'Student ID must be between 1 and 50 characters' });
+  }
+
+  if (subject.length < 1 || subject.length > 100) {
+    return res.status(400).json({ message: 'Subject must be between 1 and 100 characters' });
+  }
+
+  if (!['exam', 'quiz', 'assignment', 'project'].includes(examType.toLowerCase())) {
+    return res.status(400).json({ message: 'Exam type must be exam, quiz, assignment, or project' });
+  }
+
+  if (typeof grade !== 'number' || grade < 0 || grade > 100) {
+    return res.status(400).json({ message: 'Grade must be a number between 0 and 100' });
+  }
+
+  // Validate date format (YYYY-MM-DD)
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateRegex.test(date)) {
+    return res.status(400).json({ message: 'Date must be in YYYY-MM-DD format' });
+  }
+
+  // Validate that date is not in the future
+  const inputDate = new Date(date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (inputDate > today) {
+    return res.status(400).json({ message: 'Date cannot be in the future' });
+  }
+
+  // Validate ID parameter
+  if (!Number.isInteger(parseInt(id))) {
+    return res.status(400).json({ message: 'Invalid grade ID' });
   }
 
   const query = `
@@ -487,10 +615,36 @@ app.get('/api/students', authenticateToken, (req, res) => {
 });
 
 app.post('/api/students', authenticateToken, authorizeRole(['staff']), (req, res) => {
-  const { studentId, name, email, class: studentClass } = req.body;
+  let { studentId, name, email, class: studentClass } = req.body;
 
+  // Input validation and sanitization
   if (!studentId || !name || !email || !studentClass) {
     return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  // Sanitize inputs
+  studentId = studentId.trim();
+  name = name.trim();
+  email = email.trim().toLowerCase();
+  studentClass = studentClass.trim();
+
+  // Validate inputs
+  if (studentId.length < 1 || studentId.length > 50) {
+    return res.status(400).json({ message: 'Student ID must be between 1 and 50 characters' });
+  }
+
+  if (name.length < 2 || name.length > 100) {
+    return res.status(400).json({ message: 'Name must be between 2 and 100 characters' });
+  }
+
+  // Basic email validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ message: 'Please provide a valid email address' });
+  }
+
+  if (studentClass.length < 1 || studentClass.length > 50) {
+    return res.status(400).json({ message: 'Class must be between 1 and 50 characters' });
   }
 
   const query = `
@@ -504,13 +658,13 @@ app.post('/api/students', authenticateToken, authorizeRole(['staff']), (req, res
       return res.status(500).json({ message: 'Database error' });
     }
 
-    res.status(201).json({ 
-      id: this.lastID, 
+    res.status(201).json({
+      id: this.lastID,
       student_id: studentId,
       name: name,
       email: email,
       class: studentClass,
-      message: 'Student added successfully' 
+      message: 'Student added successfully'
     });
   });
 });
@@ -560,10 +714,39 @@ app.get('/api/staff/announcements', authenticateToken, (req, res) => {
 });
 
 app.post('/api/staff/announcements', authenticateToken, authorizeRole(['staff']), (req, res) => {
-  const { title, content, date } = req.body;
+  let { title, content, date } = req.body;
 
+  // Input validation and sanitization
   if (!title || !content || !date) {
     return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  // Sanitize inputs
+  title = title.trim();
+  content = content.trim();
+  date = date.trim();
+
+  // Validate inputs
+  if (title.length < 1 || title.length > 200) {
+    return res.status(400).json({ message: 'Title must be between 1 and 200 characters' });
+  }
+
+  if (content.length < 1 || content.length > 2000) {
+    return res.status(400).json({ message: 'Content must be between 1 and 2000 characters' });
+  }
+
+  // Validate date format (YYYY-MM-DD)
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateRegex.test(date)) {
+    return res.status(400).json({ message: 'Date must be in YYYY-MM-DD format' });
+  }
+
+  // Validate that date is not in the future
+  const inputDate = new Date(date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (inputDate > today) {
+    return res.status(400).json({ message: 'Date cannot be in the future' });
   }
 
   // Get author name from token
@@ -580,13 +763,13 @@ app.post('/api/staff/announcements', authenticateToken, authorizeRole(['staff'])
       return res.status(500).json({ message: 'Database error' });
     }
 
-    res.status(201).json({ 
-      id: this.lastID, 
+    res.status(201).json({
+      id: this.lastID,
       title: title,
       content: content,
       date: date,
       author_name: authorName,
-      message: 'Announcement posted successfully' 
+      message: 'Announcement posted successfully'
     });
   });
 });
@@ -594,10 +777,44 @@ app.post('/api/staff/announcements', authenticateToken, authorizeRole(['staff'])
 // PUT and DELETE routes for announcements
 app.put('/api/staff/announcements/:id', authenticateToken, authorizeRole(['staff']), (req, res) => {
   const { id } = req.params;
-  const { title, content, date } = req.body;
+  let { title, content, date } = req.body;
 
+  // Input validation and sanitization
   if (!title || !content || !date) {
     return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  // Sanitize inputs
+  title = title.trim();
+  content = content.trim();
+  date = date.trim();
+
+  // Validate inputs
+  if (title.length < 1 || title.length > 200) {
+    return res.status(400).json({ message: 'Title must be between 1 and 200 characters' });
+  }
+
+  if (content.length < 1 || content.length > 2000) {
+    return res.status(400).json({ message: 'Content must be between 1 and 2000 characters' });
+  }
+
+  // Validate date format (YYYY-MM-DD)
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateRegex.test(date)) {
+    return res.status(400).json({ message: 'Date must be in YYYY-MM-DD format' });
+  }
+
+  // Validate that date is not in the future
+  const inputDate = new Date(date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (inputDate > today) {
+    return res.status(400).json({ message: 'Date cannot be in the future' });
+  }
+
+  // Validate ID parameter
+  if (!Number.isInteger(parseInt(id))) {
+    return res.status(400).json({ message: 'Invalid announcement ID' });
   }
 
   const query = `
@@ -654,36 +871,79 @@ app.get('/api/admin/users', authenticateToken, authorizeRole(['admin']), (req, r
 });
 
 app.post('/api/admin/users', authenticateToken, authorizeRole(['admin']), (req, res) => {
-  const { username, email, role, password } = req.body;
+  let { username, email, role, password } = req.body;
 
+  // Input validation and sanitization
   if (!username || !email || !role || !password) {
     return res.status(400).json({ message: 'Missing required fields' });
   }
 
-  // Hash the password
-  bcrypt.hash(password, 10, (err, hash) => {
+  // Sanitize inputs
+  username = username.trim();
+  email = email.trim().toLowerCase();
+
+  // Validate inputs
+  if (username.length < 3 || username.length > 50) {
+    return res.status(400).json({ message: 'Username must be between 3 and 50 characters' });
+  }
+
+  // Basic username validation (alphanumeric and underscores/hyphens only)
+  const usernameRegex = /^[a-zA-Z0-9_-]+$/;
+  if (!usernameRegex.test(username)) {
+    return res.status(400).json({ message: 'Username can only contain letters, numbers, underscores, and hyphens' });
+  }
+
+  // Basic email validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ message: 'Please provide a valid email address' });
+  }
+
+  if (!['student', 'staff', 'admin'].includes(role)) {
+    return res.status(400).json({ message: 'Role must be student, staff, or admin' });
+  }
+
+  if (password.length < 6 || password.length > 128) {
+    return res.status(400).json({ message: 'Password must be between 6 and 128 characters' });
+  }
+
+  // Check if user already exists
+  const checkQuery = 'SELECT id FROM users WHERE username = ? OR email = ?';
+  db.get(checkQuery, [username, email], (err, existingUser) => {
     if (err) {
-      console.error('Error hashing password:', err);
-      return res.status(500).json({ message: 'Error creating user' });
+      console.error('Database error checking existing user:', err);
+      return res.status(500).json({ message: 'Database error' });
     }
 
-    const query = `
-      INSERT INTO users (username, email, password_hash, role)
-      VALUES (?, ?, ?, ?)
-    `;
+    if (existingUser) {
+      return res.status(409).json({ message: 'Username or email already exists' });
+    }
 
-    db.run(query, [username, email, hash, role], function(err) {
+    // Hash the password
+    bcrypt.hash(password, 10, (err, hash) => {
       if (err) {
-        console.error('Database error inserting user:', err);
-        return res.status(500).json({ message: 'Database error' });
+        console.error('Error hashing password:', err);
+        return res.status(500).json({ message: 'Error creating user' });
       }
 
-      res.status(201).json({
-        id: this.lastID,
-        username: username,
-        email: email,
-        role: role,
-        message: 'User created successfully'
+      const query = `
+        INSERT INTO users (username, email, password_hash, role)
+        VALUES (?, ?, ?, ?)
+      `;
+
+      db.run(query, [username, email, hash, role], function(err) {
+        if (err) {
+          console.error('Database error inserting user:', err);
+          return res.status(500).json({ message: 'Database error' });
+        }
+
+        res.status(201).json({
+          id: this.lastID,
+          username: username,
+          email: email,
+          role: role,
+          message: 'User created successfully'
+        });
       });
     });
   });
@@ -691,29 +951,73 @@ app.post('/api/admin/users', authenticateToken, authorizeRole(['admin']), (req, 
 
 app.put('/api/admin/users/:id', authenticateToken, authorizeRole(['admin']), (req, res) => {
   const { id } = req.params;
-  const { username, email, role } = req.body;
+  let { username, email, role } = req.body;
 
+  // Input validation and sanitization
   if (!username || !email || !role) {
     return res.status(400).json({ message: 'Missing required fields' });
   }
 
-  const query = `
-    UPDATE users
-    SET username = ?, email = ?, role = ?
-    WHERE id = ?
-  `;
+  // Sanitize inputs
+  username = username.trim();
+  email = email.trim().toLowerCase();
 
-  db.run(query, [username, email, role, id], function(err) {
+  // Validate inputs
+  if (username.length < 3 || username.length > 50) {
+    return res.status(400).json({ message: 'Username must be between 3 and 50 characters' });
+  }
+
+  // Basic username validation (alphanumeric and underscores/hyphens only)
+  const usernameRegex = /^[a-zA-Z0-9_-]+$/;
+  if (!usernameRegex.test(username)) {
+    return res.status(400).json({ message: 'Username can only contain letters, numbers, underscores, and hyphens' });
+  }
+
+  // Basic email validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ message: 'Please provide a valid email address' });
+  }
+
+  if (!['student', 'staff', 'admin'].includes(role)) {
+    return res.status(400).json({ message: 'Role must be student, staff, or admin' });
+  }
+
+  // Validate ID parameter
+  if (!Number.isInteger(parseInt(id))) {
+    return res.status(400).json({ message: 'Invalid user ID' });
+  }
+
+  // Check if another user already has this username/email
+  const checkQuery = 'SELECT id FROM users WHERE (username = ? OR email = ?) AND id != ?';
+  db.get(checkQuery, [username, email, id], (err, existingUser) => {
     if (err) {
-      console.error('Database error updating user:', err);
+      console.error('Database error checking existing user:', err);
       return res.status(500).json({ message: 'Database error' });
     }
 
-    if (this.changes === 0) {
-      return res.status(404).json({ message: 'User not found' });
+    if (existingUser) {
+      return res.status(409).json({ message: 'Username or email already exists' });
     }
 
-    res.json({ message: 'User updated successfully' });
+    const query = `
+      UPDATE users
+      SET username = ?, email = ?, role = ?
+      WHERE id = ?
+    `;
+
+    db.run(query, [username, email, role, id], function(err) {
+      if (err) {
+        console.error('Database error updating user:', err);
+        return res.status(500).json({ message: 'Database error' });
+      }
+
+      if (this.changes === 0) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      res.json({ message: 'User updated successfully' });
+    });
   });
 });
 
@@ -791,10 +1095,38 @@ app.delete('/api/posts/:id', authenticateToken, authorizeRole(['admin']), (req, 
   res.json({ message: 'Post deleted successfully' });
 });
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: 'Something went wrong!' });
+  console.error('Error:', err);
+
+  // Log the error with more details
+  console.error('Error details:', {
+    url: req.url,
+    method: req.method,
+    params: req.params,
+    body: req.body,
+    error: err.message,
+    stack: err.stack
+  });
+
+  // Don't expose internal error details in production
+  const errorMessage = process.env.NODE_ENV === 'production'
+    ? 'Internal server error'
+    : err.message;
+
+  res.status(500).json({
+    message: errorMessage,
+    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
+  });
 });
 
 // 404 handler
