@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
+            const userType = document.getElementById('userType').value; // Get the selected user type
 
             try {
                 const response = await fetch('/api/users/login', {
