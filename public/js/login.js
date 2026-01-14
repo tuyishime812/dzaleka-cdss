@@ -1,10 +1,24 @@
 // Login functionality
 document.addEventListener('DOMContentLoaded', function() {
+    // Check if user is already logged in and auto-logout if they navigate back to login
+    const existingToken = localStorage.getItem('token');
+    if (existingToken) {
+        // User is already logged in, so log them out before proceeding
+        localStorage.removeItem('token');
+        localStorage.removeItem('userId');
+        localStorage.removeItem('username');
+        localStorage.removeItem('role');
+        localStorage.removeItem('studentId');
+
+        // Optionally show a message
+        console.log('Previous session cleared. You must log in again.');
+    }
+
     const loginForm = document.getElementById('loginForm');
     if (loginForm) {
         loginForm.addEventListener('submit', async function(e) {
             e.preventDefault();
-            
+
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
             const userType = document.getElementById('userType').value; // Get the selected user type
