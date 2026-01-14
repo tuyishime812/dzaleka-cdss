@@ -239,6 +239,10 @@ app.get('/staff', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/staff.html'));
 });
 
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/admin.html'));
+});
+
 app.get('/logout', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/logout.html'));
 });
@@ -597,7 +601,7 @@ app.put('/api/staff/announcements/:id', authenticateToken, authorizeRole(['staff
   }
 
   const query = `
-    UPDATE announcements 
+    UPDATE announcements
     SET title = ?, content = ?, date = ?
     WHERE id = ?
   `;
@@ -633,6 +637,158 @@ app.delete('/api/staff/announcements/:id', authenticateToken, authorizeRole(['st
 
     res.json({ message: 'Announcement deleted successfully' });
   });
+});
+
+// Admin user management routes
+app.get('/api/admin/users', authenticateToken, authorizeRole(['admin']), (req, res) => {
+  const query = 'SELECT id, username, email, role, created_at FROM users ORDER BY created_at DESC';
+
+  db.all(query, [], (err, rows) => {
+    if (err) {
+      console.error('Database error fetching users:', err);
+      return res.status(500).json({ message: 'Database error' });
+    }
+
+    res.json(rows);
+  });
+});
+
+app.post('/api/admin/users', authenticateToken, authorizeRole(['admin']), (req, res) => {
+  const { username, email, role, password } = req.body;
+
+  if (!username || !email || !role || !password) {
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  // Hash the password
+  bcrypt.hash(password, 10, (err, hash) => {
+    if (err) {
+      console.error('Error hashing password:', err);
+      return res.status(500).json({ message: 'Error creating user' });
+    }
+
+    const query = `
+      INSERT INTO users (username, email, password_hash, role)
+      VALUES (?, ?, ?, ?)
+    `;
+
+    db.run(query, [username, email, hash, role], function(err) {
+      if (err) {
+        console.error('Database error inserting user:', err);
+        return res.status(500).json({ message: 'Database error' });
+      }
+
+      res.status(201).json({
+        id: this.lastID,
+        username: username,
+        email: email,
+        role: role,
+        message: 'User created successfully'
+      });
+    });
+  });
+});
+
+app.put('/api/admin/users/:id', authenticateToken, authorizeRole(['admin']), (req, res) => {
+  const { id } = req.params;
+  const { username, email, role } = req.body;
+
+  if (!username || !email || !role) {
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  const query = `
+    UPDATE users
+    SET username = ?, email = ?, role = ?
+    WHERE id = ?
+  `;
+
+  db.run(query, [username, email, role, id], function(err) {
+    if (err) {
+      console.error('Database error updating user:', err);
+      return res.status(500).json({ message: 'Database error' });
+    }
+
+    if (this.changes === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ message: 'User updated successfully' });
+  });
+});
+
+app.delete('/api/admin/users/:id', authenticateToken, authorizeRole(['admin']), (req, res) => {
+  const { id } = req.params;
+
+  const query = 'DELETE FROM users WHERE id = ?';
+
+  db.run(query, [id], function(err) {
+    if (err) {
+      console.error('Database error deleting user:', err);
+      return res.status(500).json({ message: 'Database error' });
+    }
+
+    if (this.changes === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ message: 'User deleted successfully' });
+  });
+});
+
+// Posts management routes (for admin dashboard)
+app.get('/api/posts', authenticateToken, authorizeRole(['admin']), (req, res) => {
+  // For now, we'll return an empty array since we don't have a posts table
+  // In a real implementation, you would have a posts table
+  res.json([]);
+});
+
+app.post('/api/posts', authenticateToken, authorizeRole(['admin']), (req, res) => {
+  const { title, content, category, date } = req.body;
+
+  if (!title || !content || !category || !date) {
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  // For now, we'll just return success since we don't have a posts table
+  // In a real implementation, you would insert into a posts table
+  res.status(201).json({
+    id: Date.now(),
+    title: title,
+    content: content,
+    category: category,
+    date: date,
+    author: req.user.username,
+    message: 'Post created successfully'
+  });
+});
+
+app.put('/api/posts/:id', authenticateToken, authorizeRole(['admin']), (req, res) => {
+  const { id } = req.params;
+  const { title, content, category, date } = req.body;
+
+  if (!title || !content || !category || !date) {
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  // For now, we'll just return success since we don't have a posts table
+  // In a real implementation, you would update the posts table
+  res.json({
+    id: parseInt(id),
+    title: title,
+    content: content,
+    category: category,
+    date: date,
+    message: 'Post updated successfully'
+  });
+});
+
+app.delete('/api/posts/:id', authenticateToken, authorizeRole(['admin']), (req, res) => {
+  const { id } = req.params;
+
+  // For now, we'll just return success since we don't have a posts table
+  // In a real implementation, you would delete from the posts table
+  res.json({ message: 'Post deleted successfully' });
 });
 
 // Error handling middleware

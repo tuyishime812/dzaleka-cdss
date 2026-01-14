@@ -7,8 +7,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
-            const userType = document.getElementById('userType').value;
-            
+
             try {
                 const response = await fetch('/api/users/login', {
                     method: 'POST',
@@ -20,10 +19,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         password: password
                     })
                 });
-                
+
                 if (response.ok) {
                     const result = await response.json();
-                    
+
                     // Store the token in localStorage
                     localStorage.setItem('token', result.token);
 
