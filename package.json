@@ -4,8 +4,8 @@
   "description": "Emmanuel Dzungu School Portal - A school portal for teachers to upload grades and students to check exam results",
   "main": "server.js",
   "scripts": {
-    "start": "node supabase_server.js",
-    "dev": "node supabase_server.js",
+    "start": "node final_server.js",
+    "dev": "node final_server.js",
     "build": "echo \"Build not required for this application\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
