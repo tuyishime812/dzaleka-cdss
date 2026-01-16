@@ -8,7 +8,6 @@ require('dotenv').config();
 
 console.log('Modules loaded successfully');
 
-// Database initialization
 const dbPath = path.join(__dirname, 'database.db');
 console.log('DB Path:', dbPath);
 
@@ -20,11 +19,9 @@ const db = new sqlite3.Database(dbPath, (err) => {
   }
 });
 
-// Create tables if they don't exist
 db.serialize(() => {
   console.log('Creating tables...');
   
-  // Users table
   db.run(`CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
@@ -34,7 +31,6 @@ db.serialize(() => {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
-  // Students table
   db.run(`CREATE TABLE IF NOT EXISTS students (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     student_id TEXT UNIQUE NOT NULL,
@@ -44,7 +40,6 @@ db.serialize(() => {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
-  // Teachers table
   db.run(`CREATE TABLE IF NOT EXISTS teachers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     teacher_id TEXT UNIQUE NOT NULL,
@@ -54,7 +49,6 @@ db.serialize(() => {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
-  // Grades table
   db.run(`CREATE TABLE IF NOT EXISTS grades (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     student_id TEXT NOT NULL,
@@ -66,8 +60,6 @@ db.serialize(() => {
     FOREIGN KEY (teacher_id) REFERENCES teachers(id),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
-
-  // Announcements table
   db.run(`CREATE TABLE IF NOT EXISTS announcements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
@@ -83,7 +75,6 @@ db.serialize(() => {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -91,7 +82,6 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 console.log('App initialized successfully');
 
-// Simple route for testing
 app.get('/', (req, res) => {
   res.send('Server is running!');
 });
