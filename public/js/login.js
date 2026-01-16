@@ -21,19 +21,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
-            const userType = document.getElementById('userType').value; // Get the selected user type
 
             try {
-                // For Supabase, we need to use email instead of username for login
-                // So we'll need to map the username to an email format or use a lookup
-                // For now, assuming emails are used for login
                 const response = await fetch('/api/users/login', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        email: username, // Using username field as email for now
+                        username: username, // Using the username field as submitted
                         password: password
                     })
                 });
@@ -46,12 +42,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
                     // Store user info
                     localStorage.setItem('userId', result.user.id);
-                    localStorage.setItem('username', result.user.email); // Using email as username
+                    localStorage.setItem('username', result.user.username);
                     localStorage.setItem('role', result.user.role);
 
-                    // For students, we'll use their email as their student ID
+                    // For students, we'll use their username as their student ID
                     if (result.user.role === 'student') {
-                        localStorage.setItem('studentId', result.user.email);
+                        localStorage.setItem('studentId', result.user.username);
                     }
 
                     // Redirect based on user role
