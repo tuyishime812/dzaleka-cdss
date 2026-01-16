@@ -1,0 +1,37 @@
+# Dependency directories
+node_modules/
+
+# Environment variables
+.env
+
+# Database files
+database.db
+*.db
+
+# Logs
+*.log
+logs/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Icon?
+.directory
+.Trashes
+*.swp
+*.swo
+*~
+
+# IDE files
+.vscode/
+.idea/
+*.tmp
+*.bak
+
+# Build outputs
+dist/
+build/
+out/
+.nyc_output
+coverage/
