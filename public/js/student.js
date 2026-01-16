@@ -15,7 +15,98 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Load announcements
     loadAnnouncements();
+
+    // Check for new grades since last visit
+    checkForNewGrades();
 });
+
+// Function to check for new grades since last visit
+async function checkForNewGrades() {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const username = localStorage.getItem('username');
+    const role = localStorage.getItem('role');
+
+    if (role !== 'student') {
+        return;
+    }
+
+    const studentId = username;
+    if (!studentId) {
+        return;
+    }
+
+    try {
+        // Get last visit timestamp from localStorage
+        const lastVisit = localStorage.getItem('lastVisit');
+        const now = new Date().toISOString();
+
+        // Update last visit timestamp
+        localStorage.setItem('lastVisit', now);
+
+        // Fetch grades that were added/updated after last visit
+        const response = await fetch(`/api/grades/student/${studentId}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (response.ok) {
+            const allGrades = await response.json();
+
+            // Get last visit timestamp
+            const lastVisit = localStorage.getItem('lastVisit');
+
+            if (lastVisit) {
+                // Filter grades that were created after last visit
+                const lastVisitTime = new Date(lastVisit).getTime();
+
+                const newGrades = allGrades.filter(grade => {
+                    // Assuming the grade object contains a created_at field
+                    // If the API doesn't return created_at, we'll need to modify the server
+                    const gradeTime = new Date(grade.created_at).getTime();
+                    return gradeTime > lastVisitTime;
+                });
+
+                // Show notification if there are new grades
+                if (newGrades.length > 0) {
+                    showGradeNotification(newGrades.length);
+                }
+            } else {
+                // First visit - don't show notification about existing grades
+                // Just store the current time as last visit
+                localStorage.setItem('lastVisit', now);
+            }
+        }
+    } catch (error) {
+        console.error('Error checking for new grades:', error);
+    }
+}
+
+// Function to show grade notification
+function showGradeNotification(count) {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = 'alert alert-info alert-dismissible fade show position-fixed';
+    notification.style.top = '20px';
+    notification.style.right = '20px';
+    notification.style.zIndex = '9999';
+    notification.style.minWidth = '300px';
+    notification.innerHTML = `
+        <strong>New Grades!</strong> You have ${count} new grade${count > 1 ? 's' : ''} posted.
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+
+    document.body.appendChild(notification);
+
+    // Auto-hide after 10 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 10000);
+}
 
 // Function to load student's grades
 async function loadStudentGrades() {

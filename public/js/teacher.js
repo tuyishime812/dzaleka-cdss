@@ -858,3 +858,163 @@ async function deleteSubject(subjectId, subjectName) {
         alert('Error deleting subject: ' + error.message);
     }
 }
+
+// Function to parse CSV data
+function parseCSV(csvText) {
+    const lines = csvText.split(/\r?\n/);
+    const headers = lines[0].split(',').map(header => header.trim());
+    const results = [];
+
+    for (let i = 1; i < lines.length; i++) {
+        const currentLine = lines[i].trim();
+        if (currentLine === '') continue; // Skip empty lines
+
+        const values = currentLine.split(',');
+        const obj = {};
+
+        for (let j = 0; j < headers.length; j++) {
+            obj[headers[j]] = values[j] ? values[j].trim() : '';
+        }
+
+        results.push(obj);
+    }
+
+    return results;
+}
+
+// Function to upload bulk grades
+async function uploadBulkGrades() {
+    const fileInput = document.getElementById('bulkGradeFile');
+    const resultDiv = document.getElementById('bulkUploadResult');
+    const token = localStorage.getItem('token');
+
+    if (!token) {
+        resultDiv.innerHTML = '<div class="alert alert-danger">Not authenticated. Please log in again.</div>';
+        return;
+    }
+
+    if (!fileInput.files || fileInput.files.length === 0) {
+        resultDiv.innerHTML = '<div class="alert alert-warning">Please select a CSV file to upload.</div>';
+        return;
+    }
+
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+
+    reader.onload = async function(e) {
+        try {
+            const csvData = e.target.result;
+            const parsedData = parseCSV(csvData);
+
+            if (parsedData.length === 0) {
+                resultDiv.innerHTML = '<div class="alert alert-warning">No data found in the CSV file.</div>';
+                return;
+            }
+
+            // Validate CSV structure
+            const requiredFields = ['student_id', 'subject', 'exam_type', 'grade', 'date'];
+            const firstRow = parsedData[0];
+
+            for (const field of requiredFields) {
+                if (!(field in firstRow)) {
+                    resultDiv.innerHTML = `<div class="alert alert-danger">Missing required field: ${field}. Expected format: student_id,subject,exam_type,grade,date</div>`;
+                    return;
+                }
+            }
+
+            // Process and validate all grades
+            let errorCount = 0;
+            const errors = [];
+            const validGrades = [];
+
+            for (let i = 0; i < parsedData.length; i++) {
+                const record = parsedData[i];
+
+                // Validate required fields
+                if (!record.student_id || !record.subject || !record.exam_type || !record.grade || !record.date) {
+                    errors.push(`Row ${i + 2}: Missing required field(s)`);
+                    errorCount++;
+                    continue;
+                }
+
+                // Validate grade is a number
+                const gradeValue = parseFloat(record.grade);
+                if (isNaN(gradeValue) || gradeValue < 0 || gradeValue > 100) {
+                    errors.push(`Row ${i + 2}: Invalid grade value (${record.grade}). Must be between 0 and 100.`);
+                    errorCount++;
+                    continue;
+                }
+
+                // Validate date format (YYYY-MM-DD)
+                const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+                if (!dateRegex.test(record.date)) {
+                    errors.push(`Row ${i + 2}: Invalid date format (${record.date}). Expected YYYY-MM-DD.`);
+                    errorCount++;
+                    continue;
+                }
+
+                // Validate exam type
+                const validExamTypes = ['exam', 'quiz', 'assignment', 'project'];
+                if (!validExamTypes.includes(record.exam_type.toLowerCase())) {
+                    errors.push(`Row ${i + 2}: Invalid exam type (${record.exam_type}). Must be exam, quiz, assignment, or project.`);
+                    errorCount++;
+                    continue;
+                }
+
+                // Add to valid grades array
+                validGrades.push({
+                    studentId: record.student_id,
+                    subject: record.subject,
+                    examType: record.exam_type,
+                    grade: gradeValue,
+                    date: record.date
+                });
+            }
+
+            if (validGrades.length === 0) {
+                resultDiv.innerHTML = '<div class="alert alert-danger">No valid grades to upload after validation.</div>';
+                return;
+            }
+
+            resultDiv.innerHTML = `<div class="alert alert-info">Uploading ${validGrades.length} grades...</div>`;
+
+            // Upload all grades in a single request
+            try {
+                const response = await fetch('/api/grades/bulk', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        grades: validGrades
+                    })
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    resultDiv.innerHTML = `<div class="alert alert-success">${result.message}</div>`;
+                } else {
+                    const error = await response.json();
+                    resultDiv.innerHTML = `<div class="alert alert-danger">Error uploading grades: ${error.message}</div>`;
+                }
+            } catch (err) {
+                console.error('Network error:', err);
+                resultDiv.innerHTML = `<div class="alert alert-danger">Network error: ${err.message}</div>`;
+            }
+
+            // Refresh the grades display
+            loadAllGrades();
+
+        } catch (error) {
+            console.error('Error processing CSV:', error);
+            resultDiv.innerHTML = `<div class="alert alert-danger">Error processing CSV file: ${error.message}</div>`;
+        }
+    };
+
+    reader.onerror = function() {
+        resultDiv.innerHTML = '<div class="alert alert-danger">Error reading file.</div>';
+    };
+
+    reader.readAsText(file);
+}

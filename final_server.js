@@ -360,7 +360,7 @@ app.get('/api/grades/student/:studentId', authenticateToken, (req, res) => {
   }
 
   const query = `
-    SELECT g.id, g.subject, g.exam_type, g.grade, g.date, u.username as teacher_name
+    SELECT g.id, g.subject, g.exam_type, g.grade, g.date, g.created_at, u.username as teacher_name
     FROM grades g
     LEFT JOIN users u ON g.teacher_id = u.id
     WHERE g.student_id = ?
@@ -566,6 +566,119 @@ app.delete('/api/grades/:id', authenticateToken, authorizeRole(['staff']), (req,
     }
 
     res.json({ message: 'Grade deleted successfully' });
+  });
+});
+
+// Bulk grade upload endpoint
+app.post('/api/grades/bulk', authenticateToken, authorizeRole(['staff']), (req, res) => {
+  const { grades } = req.body;
+
+  if (!grades || !Array.isArray(grades) || grades.length === 0) {
+    return res.status(400).json({ message: 'Grades array is required and must not be empty' });
+  }
+
+  // Validate all grades before inserting
+  for (let i = 0; i < grades.length; i++) {
+    const grade = grades[i];
+    const { studentId, subject, examType, grade: gradeValue, date } = grade;
+
+    if (!studentId || !subject || !examType || gradeValue === undefined || !date) {
+      return res.status(400).json({ message: `Missing required fields in grade at index ${i}` });
+    }
+
+    // Sanitize inputs
+    const sanitizedStudentId = studentId.trim();
+    const sanitizedSubject = subject.trim();
+    const sanitizedExamType = examType.trim();
+    const sanitizedDate = date.trim();
+
+    // Validate inputs
+    if (sanitizedStudentId.length < 1 || sanitizedStudentId.length > 50) {
+      return res.status(400).json({ message: `Student ID at index ${i} must be between 1 and 50 characters` });
+    }
+
+    if (sanitizedSubject.length < 1 || sanitizedSubject.length > 100) {
+      return res.status(400).json({ message: `Subject at index ${i} must be between 1 and 100 characters` });
+    }
+
+    if (!['exam', 'quiz', 'assignment', 'project'].includes(sanitizedExamType.toLowerCase())) {
+      return res.status(400).json({ message: `Exam type at index ${i} must be exam, quiz, assignment, or project` });
+    }
+
+    if (typeof gradeValue !== 'number' || gradeValue < 0 || gradeValue > 100) {
+      return res.status(400).json({ message: `Grade at index ${i} must be a number between 0 and 100` });
+    }
+
+    // Validate date format (YYYY-MM-DD)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(sanitizedDate)) {
+      return res.status(400).json({ message: `Date at index ${i} must be in YYYY-MM-DD format` });
+    }
+
+    // Validate that date is not in the future
+    const inputDate = new Date(sanitizedDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (inputDate > today) {
+      return res.status(400).json({ message: `Date at index ${i} cannot be in the future` });
+    }
+  }
+
+  // Staff member who is adding the grades
+  const staffId = req.user.id;
+
+  // Use a transaction to ensure all grades are inserted or none are
+  db.serialize(() => {
+    db.run('BEGIN TRANSACTION');
+
+    let insertedCount = 0;
+    let errorOccurred = false;
+
+    grades.forEach((grade, index) => {
+      const { studentId, subject, examType, grade: gradeValue, date } = grade;
+
+      // Sanitize inputs
+      const sanitizedStudentId = studentId.trim();
+      const sanitizedSubject = subject.trim();
+      const sanitizedExamType = examType.trim();
+      const sanitizedDate = date.trim();
+
+      const query = `
+        INSERT INTO grades (student_id, subject, exam_type, grade, date, teacher_id)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `;
+
+      db.run(query, [sanitizedStudentId, sanitizedSubject, sanitizedExamType, gradeValue, sanitizedDate, staffId], function(err) {
+        if (err) {
+          console.error(`Database error inserting grade at index ${index}:`, err);
+          errorOccurred = true;
+          return; // This won't stop the loop, but we'll check errorOccurred later
+        }
+        insertedCount++;
+      });
+    });
+
+    // Commit or rollback based on errors
+    if (errorOccurred) {
+      db.run('ROLLBACK', (err) => {
+        if (err) {
+          console.error('Error rolling back transaction:', err);
+          return res.status(500).json({ message: 'Database error during rollback' });
+        }
+        res.status(500).json({ message: 'Error inserting grades, rolled back' });
+      });
+    } else {
+      db.run('COMMIT', (err) => {
+        if (err) {
+          console.error('Error committing transaction:', err);
+          return res.status(500).json({ message: 'Database error during commit' });
+        }
+        res.status(201).json({
+          message: `Successfully uploaded ${insertedCount} grades`,
+          insertedCount: insertedCount
+        });
+      });
+    }
   });
 });
 
