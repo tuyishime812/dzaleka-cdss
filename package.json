@@ -1,7 +1,7 @@
 {
-  "name": "school-portal",
+  "name": "emmanuel-dzungu-school-portal",
   "version": "1.0.0",
-  "description": "A school portal for teachers to upload grades and students to check exam results",
+  "description": "Emmanuel Dzungu School Portal - A school portal for teachers to upload grades and students to check exam results",
   "main": "server.js",
   "scripts": {
     "start": "node supabase_server.js",

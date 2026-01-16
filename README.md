@@ -1,4 +1,4 @@
-# Dzaleka School Portal
+# Emmanuel Dzungu School Portal
 
 A comprehensive school management system with student grade tracking, staff management, and administrative features.
 

@@ -182,10 +182,10 @@ db.serialize(() => {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Rate limiting
+// Rate limiting (more permissive for development)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  max: 500, // Limit each IP to 500 requests per windowMs (increased for development)
   message: 'Too many requests from this IP, please try again later.'
 });
 
@@ -265,21 +265,27 @@ app.get('/login', (req, res) => {
 });
 
 
-app.get('/student', (req, res) => {
-  // Serve the student dashboard HTML file
-  // The JavaScript in the HTML file will check for authentication in localStorage
+app.get('/student', authenticateToken, (req, res) => {
+  // Only allow students to access student dashboard
+  if (req.user.role !== 'student') {
+    return res.status(403).send('Access denied. Students only.');
+  }
   res.sendFile(path.join(__dirname, 'public/student.html'));
 });
 
-app.get('/staff', (req, res) => {
-  // Serve the staff dashboard HTML file
-  // The JavaScript in the HTML file will check for authentication in localStorage
+app.get('/staff', authenticateToken, (req, res) => {
+  // Only allow staff to access staff dashboard
+  if (req.user.role !== 'staff') {
+    return res.status(403).send('Access denied. Staff only.');
+  }
   res.sendFile(path.join(__dirname, 'public/staff.html'));
 });
 
-app.get('/admin', (req, res) => {
-  // Serve the admin dashboard HTML file
-  // The JavaScript in the HTML file will check for authentication in localStorage
+app.get('/admin', authenticateToken, (req, res) => {
+  // Only allow admins to access admin dashboard
+  if (req.user.role !== 'admin') {
+    return res.status(403).send('Access denied. Admins only.');
+  }
   res.sendFile(path.join(__dirname, 'public/admin.html'));
 });
 
@@ -1145,7 +1151,7 @@ app.use((req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`School Portal Server is running on port ${PORT}`);
+  console.log(`Emmanuel Dzungu School Portal Server is running on port ${PORT}`);
 });
 
 module.exports = app;
