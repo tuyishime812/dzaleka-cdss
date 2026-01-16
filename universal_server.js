@@ -90,14 +90,26 @@ const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
+  // Ensure JWT_SECRET is defined
+  const jwtSecret = process.env.JWT_SECRET || 'fallback_secret_key';
+  if (!process.env.JWT_SECRET) {
+    console.warn('WARNING: JWT_SECRET is not set in environment variables. Using fallback key.');
+  }
+
   // For API routes, return JSON error
   if (req.originalUrl.startsWith('/api/')) {
     if (!token) {
       return res.status(401).json({ message: 'Access token required' });
     }
 
-    jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret_key', (err, user) => {
+    jwt.verify(token, jwtSecret, (err, user) => {
       if (err) {
+        console.error('Token verification error:', err);
+        if (err.name === 'TokenExpiredError') {
+          return res.status(403).json({ message: 'Token has expired' });
+        } else if (err.name === 'JsonWebTokenError') {
+          return res.status(403).json({ message: 'Invalid token' });
+        }
         return res.status(403).json({ message: 'Invalid or expired token' });
       }
       req.user = user;
@@ -109,8 +121,9 @@ const authenticateToken = (req, res, next) => {
       return res.redirect('/login');
     }
 
-    jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret_key', (err, user) => {
+    jwt.verify(token, jwtSecret, (err, user) => {
       if (err) {
+        console.error('Token verification error:', err);
         return res.redirect('/login');
       }
       req.user = user;
@@ -474,9 +487,14 @@ app.post('/api/users/login', (req, res) => {
       }
 
       // Generate JWT token
+      const jwtSecret = process.env.JWT_SECRET || 'fallback_secret_key';
+      if (!process.env.JWT_SECRET) {
+        console.warn('WARNING: JWT_SECRET is not set in environment variables. Using fallback key.');
+      }
+
       const token = jwt.sign(
         { id: user.id, username: user.username, role: user.role },
-        process.env.JWT_SECRET || 'fallback_secret_key',
+        jwtSecret,
         { expiresIn: '24h' }
       );
 
@@ -1408,11 +1426,16 @@ app.delete('/api/posts/:id', authenticateToken, authorizeRole(['admin']), (req, 
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.status(200).json({
+  const healthCheck = {
     status: 'OK',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
+    uptime: process.uptime(),
+    database: isPostgres ? 'PostgreSQL' : 'SQLite',
+    environment: process.env.NODE_ENV || 'development',
+    jwtConfigured: !!process.env.JWT_SECRET
+  };
+
+  res.status(200).json(healthCheck);
 });
 
 // Error handling middleware
