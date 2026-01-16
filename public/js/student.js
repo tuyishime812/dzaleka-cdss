@@ -9,10 +9,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Load student's grades
     loadStudentGrades();
-    
+
     // Load grade summary
     loadGradeSummary();
-    
+
     // Load announcements
     loadAnnouncements();
 });

@@ -2,6 +2,19 @@
 
 A comprehensive school management system with student grade tracking, staff management, and administrative features.
 
+## Supabase Migration
+
+This project has been migrated to use Supabase as the backend database and authentication system. This provides:
+
+- Scalable PostgreSQL database
+- Built-in authentication system
+- Real-time data synchronization
+- Easy data management through Supabase dashboard
+- Enhanced security features
+- Better performance and reliability
+
+For setup instructions with Supabase, see [SUPABASE_SETUP.md](SUPABASE_SETUP.md).
+
 ## Features
 
 - **Student Dashboard**: View grades, exam results, and academic progress
