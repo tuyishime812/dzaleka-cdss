@@ -212,17 +212,33 @@ const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
-  if (!token) {
-    return res.status(401).json({ message: 'Access token required' });
-  }
-
-  jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret_key', (err, user) => {
-    if (err) {
-      return res.status(403).json({ message: 'Invalid or expired token' });
+  // For API routes, return JSON error
+  if (req.originalUrl.startsWith('/api/')) {
+    if (!token) {
+      return res.status(401).json({ message: 'Access token required' });
     }
-    req.user = user;
-    next();
-  });
+
+    jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret_key', (err, user) => {
+      if (err) {
+        return res.status(403).json({ message: 'Invalid or expired token' });
+      }
+      req.user = user;
+      next();
+    });
+  } else {
+    // For page routes, redirect to login if not authenticated
+    if (!token) {
+      return res.redirect('/login');
+    }
+
+    jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret_key', (err, user) => {
+      if (err) {
+        return res.redirect('/login');
+      }
+      req.user = user;
+      next();
+    });
+  }
 };
 
 const authorizeRole = (roles) => {
@@ -249,27 +265,21 @@ app.get('/login', (req, res) => {
 });
 
 
-app.get('/student', authenticateToken, (req, res) => {
-  // Only allow students to access student dashboard
-  if (req.user.role !== 'student') {
-    return res.status(403).send('Access denied. Students only.');
-  }
+app.get('/student', (req, res) => {
+  // Serve the student dashboard HTML file
+  // The JavaScript in the HTML file will check for authentication in localStorage
   res.sendFile(path.join(__dirname, 'public/student.html'));
 });
 
-app.get('/staff', authenticateToken, (req, res) => {
-  // Only allow staff to access staff dashboard
-  if (req.user.role !== 'staff') {
-    return res.status(403).send('Access denied. Staff only.');
-  }
+app.get('/staff', (req, res) => {
+  // Serve the staff dashboard HTML file
+  // The JavaScript in the HTML file will check for authentication in localStorage
   res.sendFile(path.join(__dirname, 'public/staff.html'));
 });
 
-app.get('/admin', authenticateToken, (req, res) => {
-  // Only allow admins to access admin dashboard
-  if (req.user.role !== 'admin') {
-    return res.status(403).send('Access denied. Admins only.');
-  }
+app.get('/admin', (req, res) => {
+  // Serve the admin dashboard HTML file
+  // The JavaScript in the HTML file will check for authentication in localStorage
   res.sendFile(path.join(__dirname, 'public/admin.html'));
 });
 

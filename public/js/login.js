@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        username: username, // Using the username field as submitted
+                        username: username,
                         password: password
                     })
                 });
