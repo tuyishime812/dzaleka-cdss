@@ -58,11 +58,18 @@ if (process.env.DATABASE_URL || (process.env.DB_HOST && process.env.DB_USER && p
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Trust proxy for deployment behind reverse proxies (like Render, Heroku, etc.)
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 // Rate limiting (more permissive for development)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 500, // Limit each IP to 500 requests per windowMs (increased for development)
-  message: 'Too many requests from this IP, please try again later.'
+  message: 'Too many requests from this IP, please try again later.',
+  // Enable trust header for proxy
+  trustProxy: process.env.NODE_ENV === 'production'
 });
 
 app.use(limiter);
@@ -493,7 +500,12 @@ app.post('/api/users/login', (req, res) => {
       }
 
       const token = jwt.sign(
-        { id: user.id, username: user.username, role: user.role },
+        {
+          id: user.id,
+          username: user.username,
+          role: user.role
+          // Note: Don't include 'exp' here as it's added by expiresIn option
+        },
         jwtSecret,
         { expiresIn: '24h' }
       );
