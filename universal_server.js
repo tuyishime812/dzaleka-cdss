@@ -80,10 +80,11 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://fonts.googleapis.com", "https://kit.fontawesome.com"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://kit.fontawesome.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.jsdelivr.net", "https://kit.fontawesome.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "https://kit.fontawesome.com"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "http://localhost:*", "https://localhost:*"]
+      connectSrc: ["'self'", "http://localhost:*", "https://localhost:*"],
+      frameSrc: ["'self'"]
     }
   }
 }));
