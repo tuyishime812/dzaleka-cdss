@@ -12,8 +12,25 @@ require('dotenv').config();
 // Create Express app
 const app = express();
 
+// Trust proxy for deployment behind reverse proxies (like Render, Heroku, etc.)
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 // Security middleware
-app.use(helmet()); // Sets security headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://fonts.googleapis.com", "https://kit.fontawesome.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.jsdelivr.net", "https://kit.fontawesome.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "https://kit.fontawesome.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "http://localhost:*", "https://localhost:*"],
+      frameSrc: ["'self'"]
+    }
+  }
+})); // Sets security headers
 
 // Rate limiting for API endpoints
 const apiLimiter = rateLimit({
@@ -24,6 +41,7 @@ const apiLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  trustProxy: process.env.NODE_ENV === 'production'
 });
 app.use('/api/', apiLimiter);
 
@@ -36,6 +54,7 @@ const loginLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  trustProxy: process.env.NODE_ENV === 'production'
 });
 
 // Middleware
@@ -224,13 +243,12 @@ app.post('/api/users/login', loginLimiter, async (req, res) => {
     }
 
     // Generate JWT token with additional security claims
+    // Don't include exp in payload when using expiresIn option
     const token = jwt.sign(
       {
         id: user.id,
         username: user.username,
-        role: user.role,
-        iat: Math.floor(Date.now() / 1000), // issued at time
-        exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60) // expires in 24 hours
+        role: user.role
       },
       process.env.JWT_SECRET || 'fallback_secret_key_for_development',
       {
